@@ -1,0 +1,41 @@
+import jwt, { decode } from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'super_safety_secret';
+
+export const protectRoute = (req, res, next) => {
+    let token;
+
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        try {
+            token = req.headers.authorization.split(' ')[1];
+
+            const decoded = jwt.verify(token, JWT_SECRET);
+
+            req.user = {
+                id: decoded.id,
+                name: decoded.name,
+                role: decoded.role
+            };
+
+            next();
+        } catch (error) {
+            console.error('Token verification failed:', error.message);
+            return res.status(401).json({ message: 'Not authorized, token failed' });
+        }
+    }
+
+    if (!token) {
+        return res.status(401).json({ message: 'Not authorized, no token provided' });
+    }
+};
+
+export const authorizeRoute = (...roles) => {
+    return (req, res, next) => {
+        if (!req.user || !roles.includes(req.user.role)) {
+            return res.status(403).json({
+                message: `Forbidden: Role '${req.user?.role || 'guest'}' does not have access to this resource`
+            });
+        }
+        next();
+    };
+};
