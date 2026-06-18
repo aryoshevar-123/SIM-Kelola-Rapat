@@ -120,7 +120,11 @@ export const updateDivision = async (req, res) => {
             WHERE id = $3 
             RETURNING *
         `
-        const divisionResult = await client.query(updateDivisionQuery,[name, id]);
+        const divisionResult = await client.query(updateDivisionQuery,[
+            name,
+            description || null,
+            id
+        ]);
 
         if (divisionResult.rows.length === 0) {
             await client.query('ROLLBACK');
