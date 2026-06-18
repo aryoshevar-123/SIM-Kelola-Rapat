@@ -32,10 +32,10 @@ export const getDivisionDetails = async (req, res) => {
     try {
         const queryText = `
             SELECT
-                d.id
-                d.name
-                d.created_at
-                d.updated_at
+                d.id,
+                d.name,
+                d.created_at,
+                d.updated_at,
                 COUNT(u.id)::int AS total_members,
                 COALESCE(
                     json_agg(
@@ -53,7 +53,7 @@ export const getDivisionDetails = async (req, res) => {
             GROUP BY d.id;
         `;
 
-        const result = await pool.query(queryText);
+        const result = await pool.query(queryText, [id]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ message: 'Division not found' });
