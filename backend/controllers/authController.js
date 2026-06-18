@@ -80,4 +80,17 @@ export const loginUser = async (req,res) => {
         console.error(error.message);
         res.status(500).json({ error: 'Error in loginUser controller'})
     }
-}
+};
+
+export const logoutUser = async (req, res) => {
+  try {
+    // Remove Cookie
+
+    res.status(200).json({ 
+      message: 'Logged out successfully. Please delete your token from storage.' 
+    });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({ error: 'Error in logoutUser controller' });
+  }
+};
