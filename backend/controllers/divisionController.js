@@ -132,7 +132,7 @@ export const updateDivision = async (req, res) => {
         }
 
         let addedCount = 0;
-        let removeCount = 0;
+        let removedCount = 0;
 
         if (add_user_ids && Array.isArray(add_user_ids) && add_user_ids.length > 0) {
             const addQuery = `
