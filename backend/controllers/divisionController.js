@@ -70,7 +70,7 @@ export const getDivisionDetails = async (req, res) => {
 }
 
 export const createDivision = async (req, res) => {
-    const { name } = req.body;
+    const { name, description } = req.body;
 
     if (!name) {
         return res.status(400).json({ message: 'Division name is required' });
@@ -82,10 +82,13 @@ export const createDivision = async (req, res) => {
             return res.status(400).json({ message: 'Division name is already exists' });
         }
 
-        const newDivision = await pool.query(
-            'INSERT INTO division (name) VALUES ($1) RETURNING *',
-            [name]
-        );
+        const queryText = `
+            INSERT INTO divisions (name, description) 
+            VALUES ($1, $2) 
+            RETURNING *
+        `;
+
+        const newDivision = await pool.query(queryText, [name, description || null]);
 
         res.status (201).json({ 
             message: 'Division created successfully',
@@ -100,7 +103,7 @@ export const createDivision = async (req, res) => {
 
 export const updateDivision = async (req, res) => {
     const { id } = req.params;
-    const { name, add_user_ids, remove_user_ids } = req.body;
+    const { name, description, add_user_ids, remove_user_ids } = req.body;
 
     if (!name) {
         return res.status(400).json({ message: 'Division name is required' });
@@ -111,10 +114,13 @@ export const updateDivision = async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        const divisionResult = await client.query(
-            'UPDATE divisions SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-            [name, id]
-        );
+        const updateDivisionQuery = `
+            UPDATE divisions
+            SET name = $1, description = $2, updated_at = NOW() 
+            WHERE id = $3 
+            RETURNING *
+        `
+        const divisionResult = await client.query(updateDivisionQuery,[name, id]);
 
         if (divisionResult.rows.length === 0) {
             await client.query('ROLLBACK');
@@ -147,7 +153,7 @@ export const updateDivision = async (req, res) => {
         await client.query('COMMIT');
 
         let successMessage = 'Division updated successfully.';
-        if (addedCount > 0 || removeCount > 0) {
+        if (addedCount > 0 || removedCount > 0) {
             successMessage = `Division updated. Successfully added ${addedCount} members and remove ${removeCount} members.`
         }
 
