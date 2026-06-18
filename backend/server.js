@@ -6,6 +6,7 @@ import pool from './utils/db.js';
 
 import authRoutes from './routes/authRoutes.js';
 import divisionRoutes from './routes/divisionRoutes.js';
+import roomRoutes from './routes/roomRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -15,6 +16,7 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/divisions', divisionRoutes);
+app.use('/api/rooms', roomRoutes);
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
