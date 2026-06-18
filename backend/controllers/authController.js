@@ -4,7 +4,7 @@ import pool from '../utils/db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_safety_secret';
 
-export const registerUser = async (req,res) => {
+export const registerUser = async (req, res) => {
     const { name, email, password, role, division_id } = req.body;
 
     try {
@@ -41,7 +41,7 @@ export const registerUser = async (req,res) => {
     }
 };
 
-export const loginUser = async (req,res) => {
+export const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
     try {
