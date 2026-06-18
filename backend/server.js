@@ -14,7 +14,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
-app.use('/api/division', divisionRoutes);
+app.use('/api/divisions', divisionRoutes);
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
