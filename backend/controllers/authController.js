@@ -8,6 +8,15 @@ export const registerUser = async (req,res) => {
     const { name, email, password, role, division_id } = req.body;
 
     try {
+        if (!name || !email || !password) {
+            return res.status(400).json({ message: 'Name, email, and password are required' });
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ message: 'Invalid email format' });
+        }
+        
         const userExists = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
         if (userExists.rows.length > 0) {
             return res.status(400).json({ message: 'Email already registered' });
