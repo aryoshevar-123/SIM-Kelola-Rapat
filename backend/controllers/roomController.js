@@ -1,4 +1,4 @@
-import pool from "../utils/db";
+import pool from "../utils/db.js";
 
 export const getRooms = async (req, res) => {
     try {
@@ -66,7 +66,7 @@ export const createRoom = async (req, res) => {
 
 export const updateRoom = async (req, res) => {
     const { id } = req.params;
-    const { name, capacity, description } = req.body;
+    const { name, capacity, location_details } = req.body;
 
     if (!name || !capacity) {
         return res.status(400).json({ message: 'Room name and capacity are required' });
@@ -75,11 +75,11 @@ export const updateRoom = async (req, res) => {
     try {
         const queryText = `
             UPDATE rooms 
-            SET name = $1, capacity = $2, description = $3, updated_at = NOW() 
+            SET name = $1, capacity = $2, location_details = $3, updated_at = NOW() 
             WHERE id = $4 
             RETURNING *
         `;
-        const result = await pool.query(queryText, [name, capacity, description || null, id]);
+        const result = await pool.query(queryText, [name, capacity, location_details || null, id]);
 
         if (result.rowCount === 0) {
             return res.status(404).json({ message: 'Room not found' });
