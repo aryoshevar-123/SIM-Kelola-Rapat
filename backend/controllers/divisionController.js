@@ -67,7 +67,7 @@ export const getDivisionDetails = async (req, res) => {
         console.error(error.message);
         res.status(500).json({ error: 'Error in getDivisionDetails controller' });
     }
-}
+};
 
 export const createDivision = async (req, res) => {
     const { name, description } = req.body;
