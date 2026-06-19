@@ -1,6 +1,6 @@
 import pool from '../utils/db.js';
 import bcrypt from 'bcryptjs';
-import { uploadToCloudinary } from '../utils/cloudinaryHelper.js';
+import { deleteFromCloudinary, uploadToCloudinary } from '../utils/cloudinaryHelper.js';
 
 export const getMyProfile = async (req, res) => {
     try {
@@ -40,13 +40,17 @@ export const updateMyProfile = async (req, res) => {
             return res.status(400).json({ message: 'Email is already taken by another user' });
         }
 
-        let imageUrl = null;
+        const currentProfile = await pool.query('SELECT profile_picture FROM users WHERE id = $1', [req.user.id]);
+        const oldImageUrl = currentProfile.rows[0].profile_picture;
+
+        let imageUrl = oldImageUrl;
 
         if (req.file) {
+            if (oldImageUrl) {
+                await deleteFromCloudinary(oldImageUrl);
+            }
+
             imageUrl = await uploadToCloudinary(req.file.buffer, 'sim_kelola_rapat/profiles');
-        } else {
-            const currentProfile = await pool.query('SELECT profile_picture FROM users WHERE id = $1', [req.user.id]);
-            imageUrl = currentProfile.rows[0].profile_picture;
         }
 
         const queryText = `
