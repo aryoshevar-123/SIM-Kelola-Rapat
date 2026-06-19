@@ -16,8 +16,10 @@ export const registerUser = async (req, res) => {
         if (!emailRegex.test(email)) {
             return res.status(400).json({ message: 'Invalid email format' });
         }
+
+        const sanitizedEmail = email.toLowerCase().trim();
         
-        const userExists = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const userExists = await pool.query('SELECT * FROM users WHERE email = $1', [sanitizedEmail]);
         if (userExists.rows.length > 0) {
             return res.status(400).json({ message: 'Email already registered' });
         }
@@ -26,9 +28,9 @@ export const registerUser = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         const newUser = await pool.query(
-            `INSERT INTO users (name, email, password, role, division_id)
-            Values ($1, $2, $3, $4, $5) RETURNING id, name, email, role, division_id`,
-            [name, email, hashedPassword, role || 'user', division_id || null]
+            `INSERT INTO users (name, email, password, role, division_id, is_active)
+            Values ($1, $2, $3, $4, $5, $6) RETURNING id, name, email, role, division_id`,
+            [name, sanitizedEmail, hashedPassword, role || 'user', division_id || null, false]
         );
 
         res.status(201).json({
@@ -45,7 +47,13 @@ export const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Email and password are required' });
+        }
+
+        const sanitizedEmail = email.toLowerCase().trim();
+
+        const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [sanitizedEmail]);
         if (userResult.rows.length === 0) {
             return res.status(400).json({ message: 'Invalid email or password' });
         }
@@ -56,6 +64,12 @@ export const loginUser = async (req, res) => {
 
         if (!isMatch) {
             return res.status(400).json({ message: 'Invalid email or password' });
+        }
+
+        if (user.is_active === false) {
+            return res.status(403).json({ 
+                message: 'Your account is pending activation. Please contact the Admin.' 
+            });
         }
 
         const token = jwt.sign(
