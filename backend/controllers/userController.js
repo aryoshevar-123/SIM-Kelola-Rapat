@@ -35,12 +35,7 @@ export const getUserDetails = async (req, res) => {
     try {
         const queryText = `
             SELECT 
-                u.id, 
-                u.name, 
-                u.email, 
-                u.role, 
-                u.is_active,
-                u.division_id,
+                u.*, 
                 d.name AS division_name
             FROM users u
             LEFT JOIN divisions d ON u.division_id = d.id
@@ -52,9 +47,12 @@ export const getUserDetails = async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
+        const userWithoutPassword = { ...result.rows[0] };
+        delete userWithoutPassword.password;
+
         res.status(200).json({
             status: 'Success',
-            user: result.rows[0]
+            user: userWithoutPassword
         });
     } catch (error) {
         console.error(error.message);
