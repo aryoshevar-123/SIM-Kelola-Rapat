@@ -4,9 +4,7 @@ export const getDivisions = async (req, res) => {
     try {
         const queryText = `
             SELECT
-                d.id,
-                d.name,
-                d.created_at,
+                d.*
                 COUNT(u.id)::int AS total_members
             FROM divisions d
             LEFT JOIN users u ON d.id = u.division_id
@@ -34,6 +32,7 @@ export const getDivisionDetails = async (req, res) => {
             SELECT
                 d.id,
                 d.name,
+                d.description,
                 d.created_at,
                 d.updated_at,
                 COUNT(u.id)::int AS total_members,
@@ -43,7 +42,8 @@ export const getDivisionDetails = async (req, res) => {
                             'id', u.id,
                             'name', u.name,
                             'email', u.email,
-                            'role', u.role
+                            'role', u.role,
+                            'profile_picture', u.profile_picture
                         )
                     ) FILTER (WHERE u.id IS NOT NULL), '[]'
                 ) AS members
