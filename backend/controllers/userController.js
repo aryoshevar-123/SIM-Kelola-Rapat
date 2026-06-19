@@ -5,12 +5,7 @@ export const getUsers = async (req, res) => {
     try {
         const queryText = `
             SELECT 
-                u.id, 
-                u.name, 
-                u.email, 
-                u.role, 
-                u.is_active,
-                u.division_id,
+                u.*,
                 d.name AS division_name
             FROM users u
             LEFT JOIN divisions d ON u.division_id = d.id
@@ -18,10 +13,16 @@ export const getUsers = async (req, res) => {
         `;
         const result = await pool.query(queryText);
 
+        const sanitizedUsers = result.rows.map(user => {
+            const userWithoutPassword = { ...user };
+            delete userWithoutPassword.password;
+            return userWithoutPassword;
+        });
+
         res.status(200).json({
             status: 'Success',
-            results: result.rows.length,
-            users: result.rows
+            results: sanitizedUsers.length,
+            users: sanitizedUsers
         });
 
     } catch (error) {
