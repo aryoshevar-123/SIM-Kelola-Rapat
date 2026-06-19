@@ -16,3 +16,5 @@ router.use(protectRoute);
 router.get('/', getMyProfile);
 router.put('/', upload.single('profile_picture'), updateMyProfile);
 router.put('/password', updateMyPassword);
+
+export default router;
