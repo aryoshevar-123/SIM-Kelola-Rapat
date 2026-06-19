@@ -22,10 +22,28 @@ export const uploadToCloudinary = (fileBuffer, folder = 'general') => {
                     return reject(new Error('Failed to upload image to Cloudinary'));
                 }
                 
-                resolve(resolve.secure_url);
+                resolve(result.secure_url);
             }
         );
 
         uploadStream.end(fileBuffer);
     });
+};
+
+export const deleteFromCloudinary = async (fileUrl) => {
+    if(!fileUrl) return;
+
+    try {
+        const urlParts = fileUrl.split('/');
+        const uploadIndex = urlParts.indexOf('upload');
+
+        const filePathParts = urlParts.slice(uploadIndex + 2);
+        const filePathWithExtension = filePathParts.join('/');
+
+        const publicId = filePathWithExtension.split('.').slice(0, -1).join('.');
+
+        await cloudinary.uploader.destroy(publicId);
+    } catch (error) {
+        console.error('Failed to delete old image from Cloudinary:', error.message);
+    }
 };
