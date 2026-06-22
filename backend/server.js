@@ -9,6 +9,8 @@ import divisionRoutes from './routes/divisionRoutes.js';
 import roomRoutes from './routes/roomRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
+import meetingRoutes from './routes/meetingRoutes.js';
+import attendanceRoutes from './routes/attendanceRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -21,6 +23,8 @@ app.use('/api/divisions', divisionRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/meetings', meetingRoutes);
+app.use('/api/attendance', attendanceRoutes);
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
