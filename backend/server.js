@@ -11,6 +11,7 @@ import userRoutes from './routes/userRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import meetingRoutes from './routes/meetingRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -25,6 +26,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/meetings', meetingRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/notification', notificationRoutes);
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

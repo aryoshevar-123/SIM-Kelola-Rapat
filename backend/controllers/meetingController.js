@@ -2,8 +2,9 @@ import pool from '../utils/db.js';
 import { isPastDate } from '../utils/dateHelper.js';
 
 export const getMeetings = async (req, res) => {
+    const { id: userId, role: userRole } = req.user;
     try {
-        const queryText = `
+        const queryTextBase = `
             SELECT
                 m.*,
                 r.name AS room_name,
@@ -15,6 +16,7 @@ export const getMeetings = async (req, res) => {
             LEFT JOIN users u ON m.created_by = u.id
         `;
 
+        let queryText = queryTextBase;
         let queryParams = [];
 
         if (userRole === 'admin') {
@@ -115,14 +117,13 @@ export const createMeeting = async (req, res) => {
                         (start_time >= $3 AND end_time <= $4)
                     );
             `;
-            const overlapCheck = await pool.query(
+            const overlapCheck = await client.query(
                 overlapCheckText, [room_id, date, start_time, end_time]
             );
 
             if (overlapCheck.rowCount > 0) {
-                return res.status(400).json({
-                    message: 'Room is already reserved for another meeting.'
-                });
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: 'Room is already reserved for another meeting.' });
             }
         }
 
@@ -131,7 +132,7 @@ export const createMeeting = async (req, res) => {
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *;
         `;
-        const newMeeting = await pool.query(insertMeetingText, [
+        const newMeeting = await client.query(insertMeetingText, [
             title, 
             description || null, 
             date, 
@@ -149,8 +150,17 @@ export const createMeeting = async (req, res) => {
                 SELECT $1, unnest($2::int[]), 'absent';
             `;
             await client.query(insertAttendanceText, [meetingData.id, participant_ids]);
-        }
 
+            const insertNotificationText = `
+                INSERT INTO notifications (sender_id, receiver_id, type)
+                SELECT
+                    $1::int,    
+                    unnest($2::int[]),
+                    $3::varchar;
+            `;
+            const notifType = `invitation`;
+            await client.query(insertNotificationText, [req.user.id, participant_ids, notifType]);
+        }
         await client.query('COMMIT');
 
         res.status(201).json({
@@ -185,7 +195,7 @@ export const updateMeeting = async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        const meetingResult = await pool.query('SELECT * FROM meetings WHERE id = $1', [id]);
+        const meetingResult = await client.query('SELECT * FROM meetings WHERE id = $1', [id]);
         if (meetingResult.rowCount === 0) {
             await client.query('ROLLBACK');
             return res.status(404).json({ message: 'Meeting not found' });
@@ -226,7 +236,7 @@ export const updateMeeting = async (req, res) => {
                             (start_time >= $4 AND end_time <= $5)
                         );
                 `;
-                const overlapCheck = await pool.query(overlapCheckText, [
+                const overlapCheck = await client.query(overlapCheckText, [
                     actualRoomId, 
                     date || meeting.date, 
                     id, 
@@ -254,7 +264,7 @@ export const updateMeeting = async (req, res) => {
             WHERE id = $9
             RETURNING *;
         `;
-        const updatedResult = await pool.query(queryText, [
+        const updatedResult = await client.query(queryText, [
             title || meeting.title, 
             description !== undefined ? description : meeting.description, 
             date || meeting.date, 
@@ -273,6 +283,27 @@ export const updateMeeting = async (req, res) => {
                 ON CONFLICT (meeting_id, user_id) DO NOTHING;
             `;
             await client.query(insertAttendanceText, [id, participant_ids]);
+
+            const insertNotificationText = `
+                INSERT INTO notifications (sender_id, receiver_id, type)
+                SELECT
+                    $1::int,
+                    unnest($2::int[]),
+                    $3::varchar;
+            `;
+            let notifType = 'update';
+
+            if (status && status === 'ongoing') {
+                notifType = 'start';
+            } 
+            else if (status && status === 'canceled') {
+                notifType = 'canceled';
+            } 
+            else if (start_time || end_time || date) {
+                notifType = 'reschedule';
+            }
+
+            await client.query(insertNotificationText, [req.user.id, participant_ids, notifType]);
         }
 
         await client.query('COMMIT');
