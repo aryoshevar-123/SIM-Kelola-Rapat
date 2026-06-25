@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../utils/db.js';
+import cookieOptions from '../utils/cookieHelper.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_safety_secret';
 
@@ -78,6 +79,8 @@ export const loginUser = async (req, res) => {
             { expiresIn: '1d' }
         );
 
+        res.cookie('token', token, cookieOptions);
+
         res.json({
             message: 'Login successful',
             token,
@@ -97,14 +100,16 @@ export const loginUser = async (req, res) => {
 };
 
 export const logoutUser = async (req, res) => {
-  try {
-    // Remove Cookie
+    try {
+        const { maxAge, ...clearOptions } = cookieOptions;
 
-    res.status(200).json({ 
-      message: 'Logged out successfully. Please delete your token from storage.' 
-    });
-  } catch (error) {
-    console.error(error.message);
-    res.status(500).json({ error: 'Error in logoutUser controller' });
-  }
+        res.clearCookie('token', clearOptions);
+
+        res.status(200).json({ 
+            message: 'Logged out successfully.' 
+        });
+    } catch (error) {
+        console.error(error.message);
+        res.status(500).json({ error: 'Error in logoutUser controller' });
+    }
 };
