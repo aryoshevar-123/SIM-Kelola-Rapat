@@ -24,9 +24,7 @@
 {
     "name": "Budi Raharjo",
     "email": "budi.raharjo@company.com",
-    "password": "PasswordSuper123",
-    "role": "user",
-    "division_id": 1
+    "password": "PasswordSuper123"
 }
 ```
 * **Expected Result:** HTTP Status 201 Created, returning the newly created user object without the password field.
@@ -144,3 +142,240 @@
 ## Notes
 * The implementation of object destructuring `{ maxAge, ...clearOptions }` on `res.clearCookie` successfully solved the sticky cookie issue previously encountered during local testing rounds.
 * All automatic assertions script configured in the Postman Tests tab passed seamlessly without any asynchronous racing bugs.
+
+# Test Log: User Module
+**Date:** 25 June 2026
+**Environment:** Localhost (Development)
+**Database:** PostgreSQL
+**Tools:** Postman
+
+---
+
+## Summary
+| Cases | Passed | Failed | Percentage of Success |
+| :---: | :---: | :---: | :---: |
+| 0 | 0 | 0 | 0% |
+
+---
+
+## Test Case Execution Log
+
+### 1. Feature: Get All Users (`GET /api/users/`) 
+
+#### **TC-10: Successfully Get All Users (Happy Path)**
+
+* **Expected Result:** HTTP Status 200 OK, returning all user data without password.
+
+* **Actual Result:** As Expected.
+
+* **Status:** PASSED
+
+### 2. Feature: Get User Details (`GET /api/users/:id`)
+
+#### **TC-11: Successfully Get User's Details (Happy Path)**
+
+* **Expected Result:** HTTP Status 200 OK, returning specific user data without password.
+
+* **Actual Result:** As Expected.
+
+* **Status:** PASSED
+
+#### **TC-12: Failed - User Not Found (Negative Path)**
+
+* **Expected Result:** HTTP Status 404 Not Found, message: "User not found."
+
+* **Actual Result:** As Expected.
+
+* **Status:** PASSED
+
+### 3. Feature: Create User By Admin (`POST /api/users/`)
+
+#### **TC-13: Successfully Create New User (Happy Path)**
+
+* **Description:** Creates new authenticated user via admin role without user registration.
+
+* **Request Body:**
+```json
+{
+  "name": "Aris Setiawan",
+  "email": "aris.setiawan@company.com",
+  "password": "PasswordAdminCreated123",
+  "role": "operator",
+  "division_id": 7 
+}
+```
+
+* **Expected Result:** HTTP Status 201 User Created, returning new user data without password.
+
+* **Actual Result:** As Expected.
+
+* **Status:** PASSED
+
+#### **TC-14: Failed - Unregistered Division (Negative Path)**
+
+* **Description:** Ensures user created with registered division to prevent error during Get All User or Get User Details after user was created.
+
+* **Request Body:**
+```json
+{
+  "name": "Unregistered Division User",
+  "email": "no.division@company.com",
+  "password": "Password123",
+  "role": "user",
+  "division_id": 9999
+}
+```
+
+* **Expected Result:** HTTP Status 400 Error in Foreign Key division, message: "Division does not exist."
+
+* **Actual Result:** As Expected.
+
+* **Status:** PASSED
+
+#### **TC-15 : Failed - Empty Input Validation (Negative Path)**
+
+* **Description:** Ensures the registration is rejected if any mandatory field is missing or blank.
+
+* **Request Body:**
+```json
+{
+  "name": "Invalid User",
+  "email": "",
+  "password": ""
+}
+```
+
+* **Expected Result:** HTTP Status 400 Bad Request, message: "Name, email, and password are required"
+
+* **Actual Result:** As Expected.
+
+* **Status:** PASSED
+
+#### **TC-16 : Failed - Invalid Email Format (Negative Path)**
+
+* **Description:** Validates that the email regex pattern rejects poorly structured email addresses.
+
+```json
+{
+  "name": "Invalid Email",
+  "email": "Definitely_Not_Email",
+  "password": "123456",
+  "role": "user",
+  "division_id": 7 
+}
+```
+
+* **Expected Result:** HTTP Status 400 Bad Request, message: "Invalid email format"
+
+* **Actual Result:** HTTP Status 201 created, successfully created user without error.
+
+* **Status:** FAILED
+
+#### **TC-17: Failed - Email Already Registered (Negative Path)**
+* **Description:** Guarantees database data integrity by enforcing the UNIQUE email constraint.
+
+* **Request Body (JSON):** Same payload as TC-13
+
+* **Expected Result:** HTTP Status 400 Bad Request, message: "Email already registered"
+
+* **Actual Result:** As Expected.
+
+* **Status:** PASSED
+
+### 4. Feature: Update User (`PUT /api/users/`)
+
+#### **TC-18: Successfully Update User Data (Happy Path)**
+
+* **Request Body:**
+```json
+{
+  "name": "Aris Setiawan",
+  "role": "operator",
+  "division_id": 8,
+  "is_active": true
+}
+```
+
+* **Expected Result:** HTTP Status 200, returning correct updated data.
+
+* **Actual Result:** As Expected.
+
+* **Status:** PASSED
+
+#### **TC-19: Failed - Unregistered User (Negative Path)**
+
+* **Description:** Verifies that updating a user profile with a non-existent or unregistered User Id is blocked by the system.
+
+* **Expected Result:** HTTP Status 404 Not Found, message: "User not found"
+
+* **Actual Result:** As Expected. Server successfully intercepted the invalid ID and denied the operation.
+
+* **Status:** PASSED
+
+#### **TC-20: Failed - Empty Input Validation (Negative Path)**
+
+* **Description:** Ensures update profile is rejected if any mandatory field is missing or blank.
+
+* **Request Body:**
+```json
+{
+  "name": "Invalid User",
+  "role": "user"
+}
+```
+
+* **Expected Result:** HTTP Status 400 Bad Request, "message":"Name, role, and activation status are required."
+
+* **Actual Result:** As Expected. Server successfully denied the operation.
+
+* **Status:** PASSED
+
+#### **TC-21: Failed - Unregistered Division (Negative Path)**
+* **Request Body:**
+```json
+{
+  "name": "Unregistered Division User",
+  "email": "no.division@company.com",
+  "password": "Password123",
+  "role": "user",
+  "division_id": 9999
+}
+```
+
+* **Expected Result:** HTTP Status 400 Bad Request, message: "Division does not exist."
+
+* **Actual Result:** As Expected.
+
+* **Status:** PASSED
+
+### 5. Feature: Delete User (`DELETE /api/users/:id`)
+
+#### **TC-22: Successfully Deleted User From Database (Happy Path)**
+
+* **Description:** Ensures user deleted successfully and no remaining data lingers in database.
+
+* **Expected Result:** HTTP 200 OK, returning deleted user data and removing data from database.
+
+* **Actual Result:** As Expected.
+
+* **Status:** PASSED
+
+#### **TC-23: Failed - User Still Active (Negative Path)**
+
+* **Description:** Ensures user status must be inactive before user data is deleted.
+
+* **Expected Result:** HTTP Status 400 Bad Request, message:"Cannot delete active user."
+
+* **Actual Result:** As Expected.
+
+* **Status:** PASSED
+
+#### **TC-24: Failed - User Not Found (Negative Path)**
+
+* **Description:** Verifies that deleting a user profile with a non-existent or unregistered User Id is blocked by the system.
+
+* **Expected Result:** HTTP Status 404 Not Found, message: "User not Found."
+
+* **Actual Result:** As Expected. Server successfully denied the operation.
+
+* **Status:** PASSED
