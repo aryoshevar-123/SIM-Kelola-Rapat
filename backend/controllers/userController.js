@@ -76,6 +76,13 @@ export const createUserByAdmin = async (req, res) => {
             return res.status(400).json({ message: 'Email already registered' });
         }
 
+        if (division_id) {
+            const divisionExist = await pool.query('SELECT * FROM divisions WHERE id = $1', [division_id]);
+            if (divisionExist.rowCount === 0) {
+                return res.status(400).json({ message: 'Division does not exist' });
+            }
+        }
+
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -112,6 +119,13 @@ export const updateUser = async (req, res) => {
     }
 
     try {
+        if (division_id) {
+            const divisionExist = await pool.query('SELECT * FROM divisions WHERE id = $1', [division_id]);
+            if (divisionExist.rowCount === 0) {
+                return res.status(400).json({ message: 'Division does not exist' });
+            }
+        }
+
         const queryText = `
             UPDATE users 
             SET name = $1, role = $2, division_id = $3, is_active = $4, updated_at = NOW()
@@ -144,15 +158,23 @@ export const deleteUser = async (req, res) => {
     const { id } = req.params;
 
     try {
-        const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id, name, email', [id]);
-
+        const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+        
         if (result.rowCount === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
+        
+        const user = result.rows[0];
+
+        if (user.is_active) {
+            return res.status(400).json({ message: 'Cannot delete active user' });
+        }
+        
+        const deletedResult = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id, name, email', [id]);
 
         res.status(200).json({
             message: 'User deleted successfully',
-            deletedUser: result.rows[0]
+            deletedUser: deletedResult.rows[0]
         });
     } catch (error) {
         console.error(error.message);
