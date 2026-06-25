@@ -1,4 +1,4 @@
-import pool from "../utils/db";
+import pool from "../utils/db.js";
 
 export const getNotifications = async (req, res) => {
     const userId = req.user.id;
