@@ -4,7 +4,7 @@ export const getDivisions = async (req, res) => {
     try {
         const queryText = `
             SELECT
-                d.*
+                d.*,
                 COUNT(u.id)::int AS total_members
             FROM divisions d
             LEFT JOIN users u ON d.id = u.division_id
