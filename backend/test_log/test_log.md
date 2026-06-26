@@ -335,10 +335,9 @@
 ```json
 {
   "name": "Unregistered Division User",
-  "email": "no.division@company.com",
-  "password": "Password123",
   "role": "user",
-  "division_id": 9999
+  "division_id": 9999,
+  "is_active": true
 }
 ```
 
