@@ -269,7 +269,11 @@
 
 * **Actual Result:** HTTP Status 201 created, successfully created user without error.
 
-* **Status:** FAILED
+* **Mitigation Date:** 26 June 2026
+
+* **New Result:** HTTP Status 400 Bad Request, message: "Invalid email format."
+
+* **Status:** MITIGATED
 
 #### **TC-17: Failed - Email Already Registered (Negative Path)**
 * **Description:** Guarantees database data integrity by enforcing the UNIQUE email constraint.
@@ -377,4 +381,86 @@
 
 * **Actual Result:** As Expected. Server successfully denied the operation.
 
+* **Status:** PASSED
+
+# Test Log: Authentication Module Vulnerability
+**Date:** 26 June 2026
+**Environment:** Localhost (Development)
+**Database:** PostgreSQL
+**Tools:** Postman
+
+---
+
+## Summary
+| Cases | Passed | Failed | Percentage of Success |
+| :---: | :---: | :---: | :---: |
+| 5 | 3 | 2 | 60% |
+
+---
+
+## Test Case Execution Log
+
+### 1. Feature: Authentication Validation
+
+#### **TC-25: Failed - Password Type Pollution (Server Crash Test)**
+* **Description:** Verifies if the server can gracefully handle non-string types (e.g., Objects/Arrays) injected into the password field without crashing the Node.js runtime.
+* **Request Body (JSON):**
+  ```json
+  {
+    "name": "Crash Test",
+    "email": "crash.test@company.com",
+    "password": { "$id": 1, "attack": "object_injection" }
+  }
+  ```
+* **Expected Result:** HTTP Status 400 Bad Request or 500 Internal Server Error with a clean JSON response (Server MUST NOT crash).
+
+* **Actual Result:** HTTP Status 500 Internal Server Error with a clean JSON response and server does not crash.
+
+* **Status:** PASSED
+
+#### **TC-26: Failed - Priviledge Escalation via Role Injection**
+
+* **Description:** Ensures an unauthenticated user cannot register themselves directly with an 'admin' or 'operator' role via public registration endpoint.
+
+* **Request Body (JSON):**
+```json
+{
+  "name": "Attacker",
+  "email": "attacker@company.com",
+  "password": "Password123",
+  "role": "admin"
+}
+```
+* **Expected Result:** The system should either reject the request or force-override the role to 'user', ignoring the injected payload.
+
+* **Actual Result:** User registered successfully.
+
+* **Status:** FAILED
+
+#### **TC-27: Failed - Space Character Exploit During Login (Bypass Email Sanitization)**
+* **Description:** Login using email with unexpected space at the end (Non-breaking space or character with unrecognized unicode).
+
+* **Request Body:**
+```json
+{
+  "email": "budi.raharjo@company.com ", 
+  "password": "PasswordSuper123"
+}
+```
+* **Expected Result:** The system should reject the request.
+
+* **Actual Result:** HTTP Status 201 OK, user successfully login.
+
+* **Status:** FAILED
+
+#### **TC-28: Failed - Malformed Cookie Injection (Tamper Test)**
+
+* **Description:** Verifies that the authentication middleware handles corrupted or altered cookie token strings gracefully without breaking the server process.
+* **Headers applied:** `Cookie: token=illegal_characters_and_broken_jwt_signature_$$$`
+* **Expected Result:** HTTP Status `401 Unauthorized`, message: `"Not authorized, token failed"`. Node.js process remains stable.
+* **Status:** PASSED
+
+#### **TC-29: Success - Automated Replay Logout Bombardment (Denial of Service Test)**
+* **Description:** Simulates a heavy replay attack by triggering 50 consecutive logout requests using Postman Runner to check for memory leaks or unhandled transaction drops.
+* **Expected Result:** All subsequent iterations handle the empty cookie deletion safely without hanging the event loop.
 * **Status:** PASSED
