@@ -69,6 +69,11 @@ export const createUserByAdmin = async (req, res) => {
     }
 
     try {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ message: 'Invalid email format' });
+        }
+
         const sanitizedEmail = email.toLowerCase().trim();
 
         const userExists = await pool.query('SELECT * FROM users WHERE email = $1', [sanitizedEmail]);
