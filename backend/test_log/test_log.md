@@ -154,7 +154,7 @@
 ## Summary
 | Cases | Passed | Failed | Percentage of Success |
 | :---: | :---: | :---: | :---: |
-| 0 | 0 | 0 | 0% |
+| 15 | 14 | 1 | 93.33% |
 
 ---
 
