@@ -435,7 +435,11 @@
 
 * **Actual Result:** User registered successfully.
 
-* **Status:** FAILED
+* **Fixing Method:** Removing role from registerUser controller and force registered account role will always be 'user', ignoring the injected payload. 
+
+* **Fixed Result:** User registered successfully, returning name, email, role as 'user', and division_id as null.
+
+* **Status:** MITIGATED
 
 #### **TC-27: Failed - Space Character Exploit During Login (Bypass Email Sanitization)**
 * **Description:** Login using email with unexpected space at the end (Non-breaking space or character with unrecognized unicode).
@@ -451,7 +455,9 @@
 
 * **Actual Result:** HTTP Status 201 OK, user successfully login.
 
-* **Status:** FAILED
+* **Fixed Result:** HTTP Status 400 Invalid email or password.
+
+* **Status:** MITIGATED
 
 #### **TC-28: Failed - Malformed Cookie Injection (Tamper Test)**
 
