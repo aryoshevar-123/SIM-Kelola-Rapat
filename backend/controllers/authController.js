@@ -6,7 +6,7 @@ import cookieOptions from '../utils/cookieHelper.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'super_safety_secret';
 
 export const registerUser = async (req, res) => {
-    const { name, email, password, role, division_id } = req.body;
+    const { name, email, password } = req.body;
 
     try {
         if (!name || !email || !password) {
@@ -31,7 +31,7 @@ export const registerUser = async (req, res) => {
         const newUser = await pool.query(
             `INSERT INTO users (name, email, password, role, division_id)
             Values ($1, $2, $3, $4, $5) RETURNING id, name, email, role, division_id`,
-            [name, sanitizedEmail, hashedPassword, role || 'user', division_id || null]
+            [name, sanitizedEmail, hashedPassword, 'user', null]
         );
 
         res.status(201).json({
@@ -50,6 +50,11 @@ export const loginUser = async (req, res) => {
     try {
         if (!email || !password) {
             return res.status(400).json({ message: 'Email and password are required' });
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ message: 'Invalid email or password' });
         }
 
         const sanitizedEmail = email.toLowerCase().trim();
