@@ -470,3 +470,72 @@
 * **Description:** Simulates a heavy replay attack by triggering 50 consecutive logout requests using Postman Runner to check for memory leaks or unhandled transaction drops.
 * **Expected Result:** All subsequent iterations handle the empty cookie deletion safely without hanging the event loop.
 * **Status:** PASSED
+
+# Test Log: Authentication & Authorization Middleware
+**Date:** 29 June 2026
+**Environment:** Localhost (Development)
+**Target Route:** `GET /api/users` (Protected via global router guard)
+**Tools:** Postman
+
+---
+
+## Summary
+| Cases | Passed | Failed | Percentage of Success |
+| :---: | :---: | :---: | :---: |
+| 5 | 5 | 0 | 100% |
+
+---
+
+## Text Case Execution Log
+
+### 1. Feature: Middleware
+
+#### **TC-30: Successful Access via Cookie (Happy Path)**
+
+* **Description:** Assures that `protectRoute` correctly extracts the token from cookies and `authorizeRoute` grants access to users with the `'admin'` role.
+
+* **Expected Result:** HTTP `200 OK`, successfully passing the request down to `getUsers` controller.
+
+* **Actual Result:** HTTP `200 OK`, successfully passing the request down to `getUsers` controller.
+
+* **Status:** PASSED
+
+#### **TC-31: Successful Access via Bearer Token Fallback (Happy Path)**
+
+* **Description:** Verifies that the hybrid token detection works seamlessly, evaluating the `Authorization: Bearer <token>` header when cookies are absent.
+
+* **Expected Result:** HTTP `200 OK`.
+
+* **Actual Result:** HTTP `200 OK`.
+
+* **Status:** PASSED
+
+#### **TC-32: Failed - Missing Token (Negative Path)**
+
+* **Description:** Ensures immediate interception by `protectRoute` if a client tries to read user data anonymously.
+
+* **Expected Result:** HTTP `401 Unauthorized`, message: `"Not authorized, no token provided"`.
+
+* **Actual Result:** HTTP `401 Unauthorized`, message: `"Not authorized, no token provided"`.
+
+* **Status:** PASSED
+
+#### **TC-33: Failed - Invalid Token Signature (Negative Path)**
+
+* **Description:** Validates that `jwt.verify` securely catches modified payloads or invalid token signatures inside the `try-catch` block.
+
+* **Expected Result:** HTTP `401 Unauthorized`, message: `"Not authorized, token failed"`.
+
+* **Actual Result:** HTTP `401 Unauthorized`, message: `"Not authorized, token failed"`.
+
+* **Status:** PASSED
+
+#### **TC-34: Failed - Insufficient Privileges / Role Guard (Negative Path)**
+
+* **Description:** Tests the RBAC (Role-Based Access Control) barrier. A valid token of a regular employee (`role: 'user'`) should successfully decode but get rejected by `authorizeRoute('admin')`.
+
+* **Expected Result:** HTTP `403 Forbidden`, message: `"Forbidden: Role 'user' does not have access to this resource"`.
+
+* **Actual Result:** HTTP `403 Forbidden`, message: `"Forbidden: Role 'user' does not have access to this resource"`.
+
+* **Status:** PASSED
