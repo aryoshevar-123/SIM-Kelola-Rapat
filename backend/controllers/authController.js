@@ -118,3 +118,26 @@ export const logoutUser = async (req, res) => {
         res.status(500).json({ error: 'Error in logoutUser controller' });
     }
 };
+
+export const getMe = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const query = `
+        SELECT u.id, u.display_id, u.name, u.email, u.role, d.name AS division_name 
+        FROM users u
+        LEFT JOIN divisions d ON u.division_id = d.id
+        WHERE u.id = $1
+        `;
+        const userResult = await pool.query(query, [userId]);
+        
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        
+        res.json(userResult.rows[0]);
+    } catch (error) {
+        console.error(error.message);
+        res.status(500).json({ error: 'Error in getMe controller' });
+    }  
+};
