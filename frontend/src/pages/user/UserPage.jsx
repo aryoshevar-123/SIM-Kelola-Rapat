@@ -135,17 +135,10 @@ export default function UserPage() {
     {
       header: "ID",
       render: (row) => {
-        if (!row.updated_at) return <span className="tbl-meta mt-0.5">-</span>;
-        
-        const neatUpdatedDateFormat = new Date(row.updated_at).toLocaleDateString('id-ID', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric'
-        });
         return (
           <div>
             <p className="tbl-id">{row.display_id}</p>
-            <p className="tbl-meta mt-0.5">Upd: {neatUpdatedDateFormat}</p>
+            <p className="tbl-meta mt-0.5"> Upd: {row.updated_at ? new Date(row.updated_at).toLocaleDateString('id-ID') : '-'}</p>
           </div>
         );
       }
@@ -198,21 +191,11 @@ export default function UserPage() {
     },
     {
       header: "Terdaftar",
-      render: (row) => {
-        if (!row.created_at) return <span className="tbl-text">-</span>;
-        
-        const neatCreatedDateFormat = new Date(row.created_at).toLocaleDateString('id-ID', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric'
-        });
-
-        return (
-          <span className="tbl-text font-medium text-slate-600">
-            {neatCreatedDateFormat}
-          </span>
-        )
-      }
+      render: (row) => (
+        <span className="tbl-text font-medium text-slate-600">
+          {row.updated_at ? new Date(row.updated_at).toLocaleDateString('id-ID') : '-'}
+        </span>
+      )
     },
     {
       header: "Aksi",
