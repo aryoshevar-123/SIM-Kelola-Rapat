@@ -192,3 +192,37 @@ export const deleteUser = async (req, res) => {
         res.status(500).json({ error: 'Error in deleteUser controller' });
     }
 };
+
+export const toggleUserActivation = async (req, res) => {
+    const { id } = req.params;
+    const { is_active } = req.body;
+
+    if (is_active === undefined) {
+        return res.status(400).json({ message: 'Activation status is required' });
+    }
+
+    try {
+        const queryText = `
+            UPDATE users
+            SET is_active = $1, updated_at = NOW()
+            WHERE id = $2
+            RETURNING id, name, email, role, division_id, is_active
+        `;
+
+        const result = await pool.query(queryText, [is_active, id]);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const statusMessage = is_active ? 'User activated successfully' : 'User deactivated successfully';
+
+        res.status(200).json({
+            message: statusMessage,
+            user: result.rows[0]
+        });
+    } catch (error) {
+        console.error(error.message);
+        res.status(500).json({ error: 'Error in toggleUserActivation controller' });
+    }
+}
