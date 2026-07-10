@@ -70,34 +70,53 @@ export const getDivisionDetails = async (req, res) => {
 };
 
 export const createDivision = async (req, res) => {
-    const { name, description } = req.body;
+    const { name, description, employeeIds } = req.body; 
 
     if (!name) {
         return res.status(400).json({ message: 'Division name is required' });
     }
 
+    const client = await pool.connect();
+
     try {
-        const divisionExists = await pool.query('SELECT * FROM divisions WHERE name = $1', [name]);
+        await client.query('BEGIN');
+
+        const divisionExists = await client.query('SELECT * FROM divisions WHERE name = $1', [name]);
         if (divisionExists.rows.length > 0) {
-            return res.status(400).json({ message: 'Division name is already exists' });
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'Division name already exists' });
         }
 
-        const queryText = `
+        const insertDivisionQuery = `
             INSERT INTO divisions (name, description) 
             VALUES ($1, $2) 
             RETURNING *
         `;
+        const newDivisionResult = await client.query(insertDivisionQuery, [name, description || null]);
+        const newDivision = newDivisionResult.rows[0];
 
-        const newDivision = await pool.query(queryText, [name, description || null]);
+        if (employeeIds && Array.isArray(employeeIds) && employeeIds.length > 0) {
+            const updateUsersQuery = `
+                UPDATE users 
+                SET division_id = $1, updated_at = NOW() 
+                WHERE id = ANY($2::int[])
+            `;
+            await client.query(updateUsersQuery, [newDivision.id, employeeIds]);
+        }
 
-        res.status (201).json({ 
-            message: 'Division created successfully',
-            division: newDivision.rows[0]
+        await client.query('COMMIT');
+
+        res.status(201).json({ 
+            message: 'Division created and employees transferred successfully',
+            division: newDivision
         });
 
     } catch (error) {
-        console.error(error.message);
-        res.status(500).json({ error: 'Error in createDivision controller' });
+        await client.query('ROLLBACK');
+        console.error("Error in createDivision transaction:", error.message);
+        res.status(500).json({ error: 'Error in createDivision controller transaction' });
+    } finally {
+        client.release();
     }
 };
 
@@ -158,7 +177,7 @@ export const updateDivision = async (req, res) => {
 
         let successMessage = 'Division updated successfully.';
         if (addedCount > 0 || removedCount > 0) {
-            successMessage = `Division updated. Successfully added ${addedCount} members and remove ${removeCount} members.`
+            successMessage = `Division updated. Successfully added ${addedCount} members and remove ${removedCount} members.`
         }
 
         res.status(200).json({

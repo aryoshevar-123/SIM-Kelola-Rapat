@@ -1,75 +1,94 @@
 import React, { useState } from 'react';
-import { FiPlus, FiSearch, FiMoreVertical, FiUsers } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
+import { FiPlus, FiSearch, FiMoreVertical, FiUsers, FiAlertCircle } from 'react-icons/fi';
 import Table from '../../components/common/Table';
+import ActionDropdown from '../../components/common/ActionDropdown'; 
+import ConfirmationModal from '../../components/common/ConfirmationModal';
+import { useToast } from '../../context/ToastContext';
 
 export default function DivisionPage() {
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeDropdownId, setActiveDropdownId] = useState('');
+  const queryClient = useQueryClient();
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedDivision, setSelectedDivision] = useState(null);
+  const { showToast } = useToast();
 
-  // Mock Data yang disesuaikan dengan skema database relasional kamu
-  const mockDivisions = [
+  const {
+    data: divisions = [],
+    isLoading,
+    isError,
+    error
+  } = useQuery({
+    queryKey: ['divisions'],
+    queryFn: async () => {
+      const response = await axios.get('/api/divisions');
+      return response.data.divisions || response.data;
+    }
+  });
+
+  const {mutate: deleteDivision, isPending: isDeleting} = useMutation({
+    mutationFn: async (divisionId) => {
+      const response = await axios.delete(`/api/divisions/${divisionId}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['divisions']);
+      setIsDeleteModalOpen(false);
+      setSelectedDivision(null);
+      showToast("Divisi berhasil dihapus!", "success");
+    },
+    onError: (error) => {
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || "Gagal menghapus divisi.";
+      showToast(errorMessage, "error");
+      setIsDeleteModalOpen(false);
+      setSelectedDivision(null);
+    }
+  });
+
+  const divisionActions = [
     {
-      id: 1, // ID asli untuk relasi backend
-      display_id: "DIV-001",
-      name: "IT Developer",
-      total_members: 14, // Hasil agregasi COUNT(user.id) WHERE user.division_id = division.id
-      description: "Divisi yang bertanggung jawab atas pengembangan dan pemeliharaan seluruh sistem informasi dan infrastruktur digital internal perusahaan.",
-      created_at: "2026-01-01",
-      updated_at: "2026-06-30 10:00"
+      label: 'Edit Divisi',
+      onClick: (division) => navigate(`/divisions/edit/${division.id}`)
     },
     {
-      id: 2,
-      display_id: "DIV-002",
-      name: "Human Resources",
-      total_members: 6,
-      description: "Divisi yang mengelola siklus hidup karyawan, mulai dari rekrutmen, manajemen talenta, hingga kesejahteraan staf.",
-      created_at: "2026-01-05",
-      updated_at: "2026-05-12 09:15"
+      label: 'Lihat Detail',
+      onClick: (division) => {
+        navigate(`/divisions/details/${division.id}`);
+      }
     },
+    { divider: true },
     {
-      id: 3,
-      display_id: "DIV-003",
-      name: "Finance & Accounting",
-      total_members: 5,
-      description: "Divisi yang mengatur arus kas, pembukuan keuangan perusahaan, pelaporan pajak, dan anggaran operasional tahunan.",
-      created_at: "2026-01-10",
-      updated_at: "2026-07-02 16:45"
-    },
-    {
-      id: 4,
-      display_id: "DIV-004",
-      name: "Marketing & Branding",
-      total_members: 9,
-      description: "Divisi yang berfokus pada strategi perluasan pasar, manajemen media sosial korporat, serta promosi produk eksternal.",
-      created_at: "2026-02-20",
-      updated_at: "2026-06-25 11:00"
+      label: 'Hapus Divisi',
+      variant: 'danger',
+      onClick: (division) => {
+        setSelectedDivision(division);
+        setIsDeleteModalOpen(true);
+      }
     }
   ];
 
-  // Fungsi placeholder untuk aksi melihat detail divisi (menampilkan deskripsi & created_at)
-  const handleViewDetail = (division) => {
-    alert(
-      `Detail Divisi: ${division.name}\n\n` +
-      `Deskripsi: ${division.description}\n\n` +
-      `Tanggal Dibuat: ${division.created_at}`
-    );
-  };
-
-  // 🏛️ DEFINISI STRUKTUR KOLOM MANAJEMEN DIVISI
   const divisionColumns = [
     {
       header: "ID",
       render: (row) => (
         <div>
-          <p className="tbl-id">{row.display_id}</p>
-          <p className="tbl-meta mt-0.5">Upd: {row.updated_at}</p>
+          <p className="tbl-id">{row.display_id || `DIV-${row.id}`}</p>
+          <p className="tbl-meta mt-0.5">
+            Upd: {row.updated_at ? new Date(row.updated_at).toLocaleDateString('id-ID') : '-'}
+          </p>
         </div>
       )
     },
     {
       header: "Nama Divisi",
       accessor: "name",
-      className: "tbl-title"
+      className: "tbl-title font-semibold text-slate-800"
     },
     {
       header: "Jumlah Anggota",
@@ -79,7 +98,7 @@ export default function DivisionPage() {
             <FiUsers className="w-3.5 h-3.5" />
           </div>
           <span className="tbl-text">
-            <strong className="text-slate-800">{row.total_members}</strong> Karyawan
+            <strong className="text-slate-800">{row.total_members || 0}</strong> Karyawan
           </span>
         </div>
       )
@@ -88,27 +107,42 @@ export default function DivisionPage() {
       header: "Aksi",
       className: "text-center",
       render: (row) => (
-        <div className="flex items-center justify-center gap-1">
-          {/* Tombol Cepat Detail untuk memicu intruksi deskripsi kamu */}
-          <button 
-            onClick={() => handleViewDetail(row)}
-            className="px-2.5 py-1 text-xs font-medium border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            Detail
-          </button>
-          
-          <button className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer">
-            <FiMoreVertical className="w-4 h-4" />
-          </button>
-        </div>
+        <ActionDropdown
+          id={row.id}
+          isOpen={activeDropdownId === row.id}
+          onToggle={setActiveDropdownId}
+          actions={divisionActions}
+          rowData={row}
+        />
       )
     }
   ];
 
+  const filteredDivisions = divisions.filter(div =>
+    div.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    div.display_id?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (isLoading) {
+    return (
+      <div className="py-12 text-center">
+        <p className="text-sm font-medium text-slate-500 animate-pulse">Memuat data divisi dari server...</p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center gap-3 p-4 bg-rose-50 border border-rose-200 rounded-2xl text-sm text-rose-600 font-medium">
+        <FiAlertCircle className="w-5 h-5 shrink-0" />
+        <span>Gagal memuat data: {error.response?.data?.message || error.message}</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       
-      {/* Top Search & Action Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="relative w-full sm:w-72">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
@@ -117,26 +151,50 @@ export default function DivisionPage() {
           <input 
             type="text" 
             placeholder="Cari nama divisi..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all"
           />
         </div>
 
-        <button className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-hover transition-colors shadow-sm cursor-pointer">
+        <button 
+          onClick={() => {
+            navigate('/divisions/create');
+          }}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-hover transition-colors shadow-sm cursor-pointer"
+        >
           <FiPlus className="w-4 h-4" />
           Tambah Divisi Baru
         </button>
       </div>
 
-      {/* Komponen Tabel Reusable */}
       <Table 
         columns={divisionColumns} 
-        data={mockDivisions} 
-        totalItems={mockDivisions.length}
+        data={filteredDivisions} 
+        totalItems={filteredDivisions.length}
         currentPage={currentPage}
-        onPageChange={setCurrentPage}
+        onPageChange={(page) => {
+          setCurrentPage(page);
+          setActiveDropdownId('');
+        }}
         itemsPerPage={ITEMS_PER_PAGE}
       />
 
+      <ConfirmationModal
+        type="danger"
+        isOpen={isDeleteModalOpen}
+        isPending={isDeleting}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setSelectedDivision(null);
+        }}
+        onConfirm={() => {
+          if (selectedDivision) deleteDivision(selectedDivision.id);
+        }}
+        title="Konfirmasi Hapus Divisi"
+        message={`Apakah Anda yakin ingin menghapus "${selectedDivision?.name || 'divisi ini'}"? Tindakan ini tidak dapat dibatalkan.`}
+        confirmLabel="Hapus"
+      />
     </div>
   );
 }

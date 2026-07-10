@@ -13,6 +13,9 @@ import UserPage from './pages/user/UserPage';
 import UserCreatePage from './pages/user/UserCreatePage';
 import UserEditPage from './pages/user/UserEditPage';
 import DivisionPage from './pages/division/DivisionPage';
+import DivisionCreatePage from './pages/division/DivisionCreatePage';
+import DivisionEditPage from './pages/division/DivisionEditPage';
+import DivisionDetailsPage from './pages/division/DivisionDetailsPage';
 import RoomPage from './pages/room/RoomPage';
 import NotificationPage from './pages/notification/NotificationPage';
 import SettingsPage from './pages/settings/SettingsPage';
@@ -80,6 +83,10 @@ export default function App() {
         <Route path="/users/edit/:id" element={<UserEditPage />} />
 
         <Route path="/divisions" element={<DivisionPage />} />
+        <Route path="/divisions/create" element={<DivisionCreatePage />} />
+        <Route path="/divisions/edit/:id" element={<DivisionEditPage />} />
+        <Route path="/divisions/details/:id" element={<DivisionDetailsPage />} />
+
         <Route path="/rooms" element={<RoomPage />} />
         <Route path="/notifications" element={<NotificationPage />} />
         <Route path="/settings" element={<SettingsPage />} />
