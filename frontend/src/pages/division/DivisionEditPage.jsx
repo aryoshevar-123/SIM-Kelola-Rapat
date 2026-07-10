@@ -7,7 +7,7 @@ import { FiArrowLeft, FiSave, FiAlertCircle, FiUserCheck, FiSearch } from 'react
 import { useToast } from '../../context/ToastContext.jsx';
 
 export default function DivisionEditPage() {
-  const { id } = useParams(); // 🆔 Ambil ID divisi dari parameter URL
+  const { id } = useParams(); 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showToast } = useToast();
@@ -15,16 +15,14 @@ export default function DivisionEditPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   
-  // 👥 STATE KEANGGOTAAN
-  const [initialMembers, setInitialMembers] = useState([]); // Menampung ID anggota bawaan divisi
-  const [currentSelected, setCurrentSelected] = useState([]); // Menampung ID hasil manipulasi ceklis terbaru
+  const [initialMembers, setInitialMembers] = useState([]); 
+  const [currentSelected, setCurrentSelected] = useState([]); 
   const [searchEmployeeQuery, setSearchEmployeeQuery] = useState('');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [serverError, setServerError] = useState('');
   const [errors, setErrors] = useState({});
 
-  // 📡 1. FETCH DATA: Detail Divisi Terkait
   const { data: division, isLoading: isLoadingDiv } = useQuery({
     queryKey: ['division', id],
     queryFn: async () => {
@@ -33,7 +31,6 @@ export default function DivisionEditPage() {
     }
   });
 
-  // 📡 2. FETCH DATA: Semua Karyawan untuk List Ceklis
   const { data: users = [], isLoading: isLoadingUsers } = useQuery({
     queryKey: ['usersDropdown'],
     queryFn: async () => {
@@ -42,7 +39,6 @@ export default function DivisionEditPage() {
     }
   });
 
-  // 🔄 Efek Sinkronisasi: Isi form & petakan keanggotaan saat data selesai dimuat
   useEffect(() => {
     if (division) {
       setName(division.name || '');
@@ -52,17 +48,15 @@ export default function DivisionEditPage() {
 
   useEffect(() => {
     if (users.length > 0 && id) {
-      // Cari siapa saja karyawan yang saat ini memiliki division_id sama dengan halaman ini
       const members = users
         .filter(user => user.division_id === parseInt(id))
         .map(user => user.id);
       
       setInitialMembers(members);
-      setCurrentSelected(members); // Set default ceklis awal sesuai anggota asli
+      setCurrentSelected(members); 
     }
   }, [users, id]);
 
-  // 📡 MUTASI DATA: Mengirim payload PUT ke backend
   const { mutate: updateDivisionMutation, isPending } = useMutation({
     mutationFn: async (updatedPayload) => {
       const response = await axios.put(`/api/divisions/${id}`, updatedPayload);
@@ -70,7 +64,6 @@ export default function DivisionEditPage() {
     },
     onSuccess: (data) => {
       setIsModalOpen(false);
-      // Ikuti format response controller-mu yang mengembalikan data.message dinamis
       showToast(data.message || "Divisi berhasil diperbarui!", "success");
       queryClient.invalidateQueries({ queryKey: ['divisions'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -84,7 +77,6 @@ export default function DivisionEditPage() {
     }
   });
 
-  // Handle Aksi Centang Karyawan
   const handleEmployeeCheckboxChange = (userId) => {
     if (currentSelected.includes(userId)) {
       setCurrentSelected(currentSelected.filter(id => id !== userId));
@@ -107,7 +99,6 @@ export default function DivisionEditPage() {
     setIsModalOpen(true);
   };
 
-  // Filter List Pencarian Karyawan
   const filteredEmployees = users.filter(user => 
     user.name?.toLowerCase().includes(searchEmployeeQuery.toLowerCase()) ||
     user.division_name?.toLowerCase().includes(searchEmployeeQuery.toLowerCase())
@@ -124,7 +115,6 @@ export default function DivisionEditPage() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       
-      {/* Header Form */}
       <div className="flex items-center gap-3">
         <button 
           type="button"
@@ -148,7 +138,6 @@ export default function DivisionEditPage() {
 
       <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-2xl shadow-xs p-6 space-y-5">
         
-        {/* Seksi Informasi Dasar */}
         <div className="space-y-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-slate-600">Nama Divisi *</label>
@@ -177,7 +166,6 @@ export default function DivisionEditPage() {
           </div>
         </div>
 
-        {/* 👥 SELEKSI MULTI-USER MUTASI (DENGAN KALKULASI REQ.BODY) */}
         <div className="pt-4 border-t border-slate-100 flex flex-col gap-3">
           <div>
             <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -189,7 +177,6 @@ export default function DivisionEditPage() {
             </p>
           </div>
 
-          {/* Kotak Cari Karyawan */}
           <div className="relative">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
               <FiSearch className="w-3.5 h-3.5" />
@@ -203,7 +190,6 @@ export default function DivisionEditPage() {
             />
           </div>
 
-          {/* Scrollable Checkbox List */}
           <div className="border border-slate-200 rounded-xl max-h-52 overflow-y-auto bg-white p-2 divide-y divide-slate-50 shadow-inner">
             {filteredEmployees.length > 0 ? (
               filteredEmployees.map((user) => {
@@ -227,7 +213,6 @@ export default function DivisionEditPage() {
                       <span className="truncate font-semibold text-slate-700">{user.name}</span>
                     </div>
 
-                    {/* Badge Penunjuk Status Relasi */}
                     <span className={`px-2 py-0.5 rounded-md text-[10px] shrink-0 font-medium ${
                       isOriginallyMember 
                         ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/50' 
@@ -246,7 +231,6 @@ export default function DivisionEditPage() {
           </div>
         </div>
 
-        {/* Form Footer Buttons */}
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
           <button 
             type="button" 
@@ -267,18 +251,14 @@ export default function DivisionEditPage() {
 
       </form>
       
-      {/* 🥞 MODAL KONFIRMASI DENGAN KALKULASI STRUKTUR DATA DIFF */}
       <ConfirmationModal
         type="brand"
         isOpen={isModalOpen}
         isPending={isPending}
         onClose={() => setIsModalOpen(false)}
         onConfirm={() => {
-          // 🔥 KALKULASI UTAMA (DIFFING ARRAY ID)
-          // add_user_ids: Yang ada di list pilihan baru tetapi sebelumnya BUKAN anggota asli
           const add_user_ids = currentSelected.filter(id => !initialMembers.includes(id));
           
-          // remove_user_ids: Yang ada di daftar anggota asli tetapi sekarang DI-KOSONGKAN centangnya
           const remove_user_ids = initialMembers.filter(id => !currentSelected.includes(id));
 
           updateDivisionMutation({

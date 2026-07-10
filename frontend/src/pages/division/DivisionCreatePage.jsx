@@ -11,7 +11,6 @@ export default function DivisionCreatePage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   
-  // 🔥 STATE BARU: Menampung array ID user yang diceklis
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [searchEmployeeQuery, setSearchEmployeeQuery] = useState('');
 
@@ -20,7 +19,6 @@ export default function DivisionCreatePage() {
   const [serverError, setServerError] = useState('');
   const [errors, setErrors] = useState({});
 
-  // 📡 FETCH DATA: Ambil seluruh karyawan untuk di-render di dalam list pilihan
   const { data: users = [] } = useQuery({
     queryKey: ['usersDropdown'],
     queryFn: async () => {
@@ -29,7 +27,6 @@ export default function DivisionCreatePage() {
     }
   });
 
-  // 📡 MUTASI DATA (Payload disesuaikan dengan request array)
   const { mutate: createDivision, isPending } = useMutation({
     networkMode: 'always',
     mutationFn: async (newDivisionData) => {
@@ -49,7 +46,6 @@ export default function DivisionCreatePage() {
     }
   });
 
-  // Handle Fungsi Ceklis Karyawan
   const handleEmployeeCheckboxChange = (userId) => {
     if (selectedEmployees.includes(userId)) {
       setSelectedEmployees(selectedEmployees.filter(id => id !== userId));
@@ -72,7 +68,6 @@ export default function DivisionCreatePage() {
     setIsModalOpen(true);
   };
 
-  // Filter Karyawan Berdasarkan Pencarian di Kotak Pilihan
   const filteredEmployees = users.filter(user => 
     user.name?.toLowerCase().includes(searchEmployeeQuery.toLowerCase()) ||
     user.division_name?.toLowerCase().includes(searchEmployeeQuery.toLowerCase())
@@ -81,7 +76,6 @@ export default function DivisionCreatePage() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       
-      {/* Header Layout */}
       <div className="flex items-center gap-3">
         <button 
           onClick={() => navigate('/divisions')}
@@ -104,7 +98,6 @@ export default function DivisionCreatePage() {
 
       <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-2xl shadow-xs p-6 space-y-5">
         
-        {/* Kolom Informasi Divisi */}
         <div className="space-y-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-slate-600">Nama Divisi *</label>
@@ -135,7 +128,6 @@ export default function DivisionCreatePage() {
           </div>
         </div>
 
-        {/* 🔥 SELEKSI MULTI-USER: Ambil & Masukkan Karyawan Langsung */}
         <div className="pt-4 border-t border-slate-100 flex flex-col gap-3">
           <div>
             <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -147,7 +139,6 @@ export default function DivisionCreatePage() {
             </p>
           </div>
 
-          {/* Kolom Search Internal Karyawan */}
           <div className="relative">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
               <FiSearch className="w-3.5 h-3.5" />
@@ -161,7 +152,6 @@ export default function DivisionCreatePage() {
             />
           </div>
 
-          {/* Scrollable Checkbox Box List */}
           <div className="border border-slate-200 rounded-xl max-h-52 overflow-y-auto bg-white p-2 divide-y divide-slate-50 shadow-inner">
             {filteredEmployees.length > 0 ? (
               filteredEmployees.map((user) => (
@@ -199,7 +189,6 @@ export default function DivisionCreatePage() {
           )}
         </div>
 
-        {/* Form Action Footer */}
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
           <button 
             type="button" 
@@ -220,7 +209,6 @@ export default function DivisionCreatePage() {
 
       </form>
       
-      {/* Modal Dialog Konfirmasi */}
       <ConfirmationModal
         type="brand"
         isOpen={isModalOpen}
@@ -230,7 +218,7 @@ export default function DivisionCreatePage() {
           createDivision({
             name,
             description: description.trim() || null,
-            employeeIds: selectedEmployees // 🔥 Kirimkan kumpulan ID Karyawan pilihan
+            employeeIds: selectedEmployees 
           });
         }}
         title="Konfirmasi Struktur Divisi"
