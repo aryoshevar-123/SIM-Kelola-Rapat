@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { FiPlus, FiSearch, FiMoreVertical, FiUsers, FiAlertCircle } from 'react-icons/fi';
+import { FiPlus, FiSearch, FiMoreVertical, FiUsers, FiAlertCircle, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import Table from '../../components/common/Table';
 import ActionDropdown from '../../components/common/ActionDropdown'; 
 import ConfirmationModal from '../../components/common/ConfirmationModal';
@@ -54,10 +54,12 @@ export default function DivisionPage() {
   const divisionActions = [
     {
       label: 'Edit Divisi',
+      icon: FiEdit2,
       onClick: (division) => navigate(`/divisions/edit/${division.id}`)
     },
     {
       label: 'Lihat Detail',
+      icon: FiUsers,
       onClick: (division) => {
         navigate(`/divisions/details/${division.id}`);
       }
@@ -65,6 +67,7 @@ export default function DivisionPage() {
     { divider: true },
     {
       label: 'Hapus Divisi',
+      icon: FiTrash2,
       variant: 'danger',
       onClick: (division) => {
         setSelectedDivision(division);
