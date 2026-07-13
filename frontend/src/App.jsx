@@ -19,6 +19,12 @@ import DivisionDetailsPage from './pages/division/DivisionDetailsPage';
 import RoomPage from './pages/room/RoomPage';
 import NotificationPage from './pages/notification/NotificationPage';
 import SettingsPage from './pages/settings/SettingsPage';
+import RoomCreatePage from './pages/room/RoomCreatePage';
+import RoomEditPage from './pages/room/RoomEditPage';
+import RoomDetailsPage from './pages/room/RoomDetailsPage';
+import MeetingCreatePage from './pages/meeting/MeetingCreatePage';
+import MeetingDetailsPage from './pages/meeting/MeetingDetailsPage';
+import MeetingEditPage from './pages/meeting/MeetingEditPage';
 
 function PublicLayout() {
   const { data: authUser, isLoading } = useAuthUser();
@@ -76,8 +82,12 @@ export default function App() {
         <Route path="/" element={<Navigate to="/home" replace />} />
         
         <Route path="/home" element={<HomePage />} />
-        <Route path="/meetings" element={<MeetingPage />} />
 
+        <Route path="/meetings" element={<MeetingPage />} />
+        <Route path="/meetings/create" element={<MeetingCreatePage />} />
+        <Route path="/meetings/details/:id" element={<MeetingDetailsPage />} />
+        <Route path="/meetings/edit/:id" element={<MeetingEditPage />} />
+ 
         <Route path="/users" element={<UserPage />} />
         <Route path="/users/create" element={<UserCreatePage />} />
         <Route path="/users/edit/:id" element={<UserEditPage />} />
@@ -88,6 +98,10 @@ export default function App() {
         <Route path="/divisions/details/:id" element={<DivisionDetailsPage />} />
 
         <Route path="/rooms" element={<RoomPage />} />
+        <Route path="/rooms/create" element={<RoomCreatePage />} />
+        <Route path="/rooms/edit/:id" element={<RoomEditPage />} />
+        <Route path="/rooms/details/:id" element={<RoomDetailsPage />} />
+
         <Route path="/notifications" element={<NotificationPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>

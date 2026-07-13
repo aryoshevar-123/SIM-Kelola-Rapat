@@ -57,7 +57,7 @@ export const getMeetingDetails = async (req, res) => {
     const { id } = req.params;
     try {
         const queryText = `
-            SELECT m.*, r.name AS room_name, u.name AS creator_name
+            SELECT m.*, r.name AS room_name, u.name AS creator_name, u.profile_picture AS creator_picture
             FROM meetings m
             LEFT JOIN rooms r ON m.room_id = r.id
             LEFT JOIN users u ON m.created_by = u.id
@@ -285,13 +285,15 @@ export const updateMeeting = async (req, res) => {
             await client.query(insertAttendanceText, [id, participant_ids]);
 
             const insertNotificationText = `
-                INSERT INTO notifications (sender_id, receiver_id, type)
+                INSERT INTO notifications (sender_id, receiver_id, type, message)
                 SELECT
                     $1::int,
                     unnest($2::int[]),
-                    $3::varchar;
+                    $3::varchar,
+                    $4::text;
             `;
             let notifType = 'update';
+            let message = ''
 
             if (status && status === 'ongoing') {
                 notifType = 'start';
@@ -303,7 +305,7 @@ export const updateMeeting = async (req, res) => {
                 notifType = 'reschedule';
             }
 
-            await client.query(insertNotificationText, [req.user.id, participant_ids, notifType]);
+            await client.query(insertNotificationText, [req.user.id, participant_ids, notifType, message]);
         }
 
         await client.query('COMMIT');
