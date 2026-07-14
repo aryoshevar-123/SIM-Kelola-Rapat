@@ -5,7 +5,7 @@ import {
     createUserByAdmin,
     updateUser,
     deleteUser,
-    toggleUserActivation
+    toggleUserActivation,
 } from '../controllers/userController.js';
 import { protectRoute, authorizeRoute } from '../middleware/authMiddleware.js';
 

@@ -1,23 +1,14 @@
-import pool from '../utils/db.js';
+import { User } from '../models/userModel.js';
 import bcrypt from 'bcryptjs';
 import { deleteFromCloudinary, uploadToCloudinary } from '../utils/cloudinaryHelper.js';
 
 export const getMyProfile = async (req, res) => {
     try {
-        const queryText = `
-            SELECT u.id, u.name, u.email, u.role, u.profile_picture, d.name AS division_name
-            FROM users u
-            LEFT JOIN divisions d ON u.division_id = d.id
-            WHERE u.id = $1;
-        `;
-        const result = await pool.query(queryText, [req.user.id]);
-
-        res.status(200).json({
-            status: 'Success',
-            user: result.rows[0]
-        });
+        const user = await User.findOne({ id: req.user.id });
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        res.status(200).json({ status: 'Success', user });
     } catch (error) {
-        console.error(error.message);
+        console.error("Error in getMyProfile:", error.message);
         res.status(500).json({ error: 'Error in getMyProfile controller' });
     }
 };
@@ -25,53 +16,34 @@ export const getMyProfile = async (req, res) => {
 export const updateMyProfile = async (req, res) => {
     const { name, email } = req.body;
 
-    if (!name || !email) {
-        return res.status(400).json({ message: 'Name and email are required' });
-    }
+    if (!name || !email) return res.status(400).json({ message: 'Name and email are required' });
 
     try {
         const sanitizedEmail = email.toLowerCase().trim();
-
-        const emailCheck = await pool.query(
-            'SELECT * FROM users WHERE email = $1 AND id != $2', 
-            [sanitizedEmail, req.user.id]
-        );
-        if (emailCheck.rowCount > 0) {
+        const emailCheck = await User.findOne({ email: sanitizedEmail });
+        if (emailCheck && emailCheck.id !== req.user.id) {
             return res.status(400).json({ message: 'Email is already taken by another user' });
         }
 
-        const currentProfile = await pool.query('SELECT profile_picture FROM users WHERE id = $1', [req.user.id]);
-        const oldImageUrl = currentProfile.rows[0].profile_picture;
-
+        const currentProfile = await User.findOne({ id: req.user.id });
+        const oldImageUrl = currentProfile?.profile_picture;
         let imageUrl = oldImageUrl;
 
         if (req.file) {
-            if (oldImageUrl) {
-                await deleteFromCloudinary(oldImageUrl);
-            }
-
+            if (oldImageUrl) await deleteFromCloudinary(oldImageUrl);
             imageUrl = await uploadToCloudinary(req.file.buffer, 'sim_kelola_rapat/profiles');
         }
 
-        const queryText = `
-            UPDATE users 
-            SET name = $1, email = $2, profile_picture = $3, updated_at = NOW()
-            WHERE id = $4
-            RETURNING id, name, email, role, profile_picture
-        `;
-        const result = await pool.query(queryText, [
-            name, 
-            sanitizedEmail, 
-            imageUrl, 
-            req.user.id
-        ]);
+        const updatedUser = await User.update(req.user.id, {
+            name, email: sanitizedEmail, profilePicture: imageUrl
+        });
 
         res.status(200).json({
             message: 'Profile updated successfully',
-            user: result.rows[0]
+            user: { id: updatedUser.id, name: updatedUser.name, email: updatedUser.email, role: updatedUser.role, profile_picture: updatedUser.profile_picture }
         });
     } catch (error) {
-        console.error(error.message);
+        console.error("Error in updateMyProfile:", error.message);
         res.status(500).json({ error: 'Error in updateMyProfile controller' });
     }
 };
@@ -79,29 +51,18 @@ export const updateMyProfile = async (req, res) => {
 export const updateMyPassword = async (req, res) => {
     const { current_password, new_password } = req.body;
 
-    if (!current_password || !new_password) {
-        return res.status(400).json({ message: 'Current and new passwords are required' });
-    }
+    if (!current_password || !new_password) return res.status(400).json({ message: 'Current and new passwords are required' });
+    
     try {
-        const userResult = await pool.query('SELECT password FROM users WHERE id = $1', [req.user.id]);
-        const user = userResult.rows[0];
-
+        const user = await User.findOne({ id: req.user.id }, true);
         const isMatch = await bcrypt.compare(current_password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ message: 'Incorrect current password' });
-        }
+        if (!isMatch) return res.status(400).json({ message: 'Incorrect current password' });
 
-        const salt = await bcrypt.genSalt(10);
-        const hashedNewPassword = await bcrypt.hash(new_password, salt);
-
-        await pool.query(
-            'UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2',
-            [hashedNewPassword, req.user.id]
-        );
-
+        // Kirim text murni, auto-bcrypt diproses otomatis di dalam Model
+        await User.update(req.user.id, { password: new_password });
         res.status(200).json({ message: 'Password updated successfully' });
     } catch (error) {
-        console.error(error.message);
+        console.error("Error in updateMyPassword:", error.message);
         res.status(500).json({ error: 'Error in updateMyPassword controller' });
     }
 };

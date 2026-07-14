@@ -1,32 +1,13 @@
-import pool from '../utils/db.js';
-import bcrypt from 'bcryptjs';
+import { User } from "../models/userModel.js";
+import { Division } from "../models/divisionModel.js";
 
 export const getUsers = async (req, res) => {
+    const { status } = req.query; 
     try {
-        const queryText = `
-            SELECT 
-                u.*,
-                d.name AS division_name
-            FROM users u
-            LEFT JOIN divisions d ON u.division_id = d.id
-            ORDER BY u.name ASC;
-        `;
-        const result = await pool.query(queryText);
-
-        const sanitizedUsers = result.rows.map(user => {
-            const userWithoutPassword = { ...user };
-            delete userWithoutPassword.password;
-            return userWithoutPassword;
-        });
-
-        res.status(200).json({
-            status: 'Success',
-            results: sanitizedUsers.length,
-            users: sanitizedUsers
-        });
-
+        const users = await User.findAll(status);
+        res.status(200).json({ status: 'Success', results: users.length, users });
     } catch (error) {
-        console.error(error.message);
+        console.error("Error in getUsers Controller:", error.message);
         res.status(500).json({ error: 'Error in getUsers controller' });
     }
 };
@@ -34,29 +15,11 @@ export const getUsers = async (req, res) => {
 export const getUserDetails = async (req, res) => {
     const { id } = req.params;
     try {
-        const queryText = `
-            SELECT 
-                u.*, 
-                d.name AS division_name
-            FROM users u
-            LEFT JOIN divisions d ON u.division_id = d.id
-            WHERE u.id = $1;
-        `;
-        const result = await pool.query(queryText, [id]);
-
-        if (result.rowCount === 0) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        const userWithoutPassword = { ...result.rows[0] };
-        delete userWithoutPassword.password;
-
-        res.status(200).json({
-            status: 'Success',
-            user: userWithoutPassword
-        });
+        const user = await User.findOne({ id });
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        res.status(200).json({ status: 'Success', user });
     } catch (error) {
-        console.error(error.message);
+        console.error("Error in getUserDetails Controller:", error.message);
         res.status(500).json({ error: 'Error in getUserDetails controller' });
     }
 };
@@ -64,53 +27,28 @@ export const getUserDetails = async (req, res) => {
 export const createUserByAdmin = async (req, res) => {
     const { name, email, password, role, division_id } = req.body;
 
-    if (!name || !email || !password) {
-        return res.status(400).json({ message: 'Name, email, and password are required' });
-    }
+    if (!name || !email || !password) return res.status(400).json({ message: 'Name, email, and password are required' });
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return res.status(400).json({ message: 'Invalid email format' });
 
     try {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            return res.status(400).json({ message: 'Invalid email format' });
-        }
-
         const sanitizedEmail = email.toLowerCase().trim();
-
-        const userExists = await pool.query('SELECT * FROM users WHERE email = $1', [sanitizedEmail]);
-        if (userExists.rowCount > 0) {
-            return res.status(400).json({ message: 'Email already registered' });
-        }
+        const userExists = await User.findOne({ email: sanitizedEmail });
+        if (userExists) return res.status(400).json({ message: 'Email already registered' });
 
         if (division_id) {
-            const divisionExist = await pool.query('SELECT * FROM divisions WHERE id = $1', [division_id]);
-            if (divisionExist.rowCount === 0) {
-                return res.status(400).json({ message: 'Division does not exist' });
-            }
+            const divisionExist = await Division.findOne({ id: division_id });
+            if (!divisionExist) return res.status(400).json({ message: 'Division does not exist' });
         }
 
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        const queryText = `
-            INSERT INTO users (name, email, password, role, division_id, is_active)
-            VALUES ($1, $2, $3, $4, $5, $6) 
-            RETURNING id, name, email, role, division_id, is_active
-        `;
-        const newUser = await pool.query(queryText, [
-            name, 
-            sanitizedEmail, 
-            hashedPassword, 
-            role || 'user', 
-            division_id || null, 
-            true
-        ]);
-
-        res.status(201).json({
-            message: 'User created successfully by Admin',
-            user: newUser.rows[0]
+        const newUser = await User.create({
+            name, email: sanitizedEmail, password, role, divisionId: division_id
         });
+
+        res.status(201).json({ message: 'User created successfully by Admin', user: newUser });
     } catch (error) {
-        console.error(error.message);
+        console.error("Error in createUserByAdmin Controller:", error.message);
         res.status(500).json({ error: 'Error in createUserByAdmin controller' });
     }
 };
@@ -125,71 +63,19 @@ export const updateUser = async (req, res) => {
 
     try {
         if (division_id) {
-            const divisionExist = await pool.query('SELECT * FROM divisions WHERE id = $1', [division_id]);
-            if (divisionExist.rowCount === 0) {
-                return res.status(400).json({ message: 'Division does not exist' });
-            }
+            const divisionExist = await Division.findOne({ id: division_id });
+            if (!divisionExist) return res.status(400).json({ message: 'Division does not exist' });
         }
 
-        const queryText = `
-            UPDATE users 
-            SET name = $1, role = $2, division_id = $3, is_active = $4, updated_at = NOW()
-            WHERE id = $5 
-            RETURNING id, name, email, role, division_id, is_active
-        `;
-        const result = await pool.query(queryText, [
-            name, 
-            role, 
-            division_id || null, 
-            is_active, 
-            id
-        ]);
-
-        if (result.rowCount === 0) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        res.status(200).json({
-            message: 'User updated successfully',
-            user: result.rows[0]
+        const updatedUser = await User.update(id, {
+            name, role, divisionId: division_id, isActive: is_active
         });
+
+        if (!updatedUser) return res.status(404).json({ message: 'User not found' });
+        res.status(200).json({ message: 'User updated successfully', user: updatedUser });
     } catch (error) {
-        console.error(error.message);
+        console.error("Error in updateUser Controller:", error.message);
         res.status(500).json({ error: 'Error in updateUser controller' });
-    }
-};
-
-export const deleteUser = async (req, res) => {
-    const { id } = req.params;
-
-    try {
-        const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
-        
-        if (result.rowCount === 0) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-        
-        const user = result.rows[0];
-
-        if (user.is_active) {
-            return res.status(400).json({ message: 'Cannot delete active user' });
-        }
-        
-        const deletedResult = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id, name, email', [id]);
-
-        res.status(200).json({
-            message: 'User deleted successfully',
-            deletedUser: deletedResult.rows[0]
-        });
-    } catch (error) {
-        console.error(error.message);
-        
-        if (error.code === '23503') {
-            return res.status(400).json({ 
-                message: 'Cannot delete user. This user has operational history (e.g., booked meetings) in the system.' 
-            });
-        }
-        res.status(500).json({ error: 'Error in deleteUser controller' });
     }
 };
 
@@ -197,32 +83,35 @@ export const toggleUserActivation = async (req, res) => {
     const { id } = req.params;
     const { is_active } = req.body;
 
-    if (is_active === undefined) {
-        return res.status(400).json({ message: 'Activation status is required' });
-    }
+    if (is_active === undefined) return res.status(400).json({ message: 'Activation status is required' });
 
     try {
-        const queryText = `
-            UPDATE users
-            SET is_active = $1, updated_at = NOW()
-            WHERE id = $2
-            RETURNING id, name, email, role, division_id, is_active
-        `;
-
-        const result = await pool.query(queryText, [is_active, id]);
-
-        if (result.rowCount === 0) {
-            return res.status(404).json({ message: 'User not found' });
-        }
+        const updatedUser = await User.update(id, { isActive: is_active });
+        if (!updatedUser) return res.status(404).json({ message: 'User not found' });
 
         const statusMessage = is_active ? 'User activated successfully' : 'User deactivated successfully';
-
-        res.status(200).json({
-            message: statusMessage,
-            user: result.rows[0]
-        });
+        res.status(200).json({ message: statusMessage, user: updatedUser });
     } catch (error) {
-        console.error(error.message);
+        console.error("Error in toggleUserActivation Controller:", error.message);
         res.status(500).json({ error: 'Error in toggleUserActivation controller' });
     }
-}
+};
+
+export const deleteUser = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await User.delete(id);
+
+        if (!result.success) {
+            if (result.type === 'NOT_FOUND') return res.status(404).json({ message: 'User not found' });
+            if (result.type === 'IS_ACTIVE') return res.status(400).json({ message: 'Cannot delete active user' });
+            if (result.type === 'OPERATIONAL_HISTORY') {
+                return res.status(400).json({ message: 'Cannot delete user. This user has operational history (e.g., booked meetings) in the system.' });
+            }
+        }
+        res.status(200).json({ message: 'User deleted successfully', deletedUser: result.deletedUser });
+    } catch (error) {
+        console.error("Error in deleteUser Controller:", error.message);
+        res.status(500).json({ error: 'Error in deleteUser controller' });
+    }
+};

@@ -1,39 +1,20 @@
+import { Room } from "../models/roomModel.js";
+import { Meeting } from "../models/meetingModel.js";
 import pool from "../utils/db.js";
 
 export const getRooms = async (req, res) => {
     try {
-        const queryText = `
-            SELECT 
-                r.id,
-                r.display_id,
-                r.name,
-                r.capacity,
-                r.location_details,
-                r.created_at,
-                r.updated_at,
-                CASE 
-                    WHEN EXISTS (
-                        SELECT 1 
-                        FROM meetings m
-                        WHERE m.room_id = r.id
-                          AND m.date = CURRENT_DATE
-                          AND NOW()::time BETWEEN m.start_time AND m.end_time
-                    ) THEN 'Sibuk'
-                    ELSE 'Tersedia'
-                 END AS status
-            FROM rooms r
-            ORDER BY r.name ASC;
-        `;
+        const rooms = await Room.findAll();
+        const occupiedRoomIds = await Meeting.findOccupiedRoomIds();
+        
+        const roomsWithStatus = rooms.map(room => ({
+            ...room,
+            status: occupiedRoomIds.includes(room.id) ? 'Sibuk' : 'Tersedia'
+        }));
 
-        const result = await pool.query(queryText);
-    
-        res.status(200).json({
-            status: 'Success',
-            results: result.rows.length,
-            rooms: result.rows
-        });
+        res.status(200).json({ status: 'Success', results: roomsWithStatus.length, rooms: roomsWithStatus });
     } catch (error) {
-        console.error("Error in getRooms:", error.message);
+        console.error("Error in getRooms Controller:", error.message);
         res.status(500).json({ error: 'Error in getRooms controller' });
     }
 };
@@ -41,89 +22,49 @@ export const getRooms = async (req, res) => {
 export const getRoomDetails = async (req, res) => {
     const { id } = req.params;
     try {
-        const queryText = `
-            SELECT 
-                r.id, r.display_id, r.name, r.capacity, r.location_details, r.created_at, r.updated_at,
-                CASE 
-                    WHEN EXISTS (
-                        SELECT 1 FROM meetings m 
-                        WHERE m.room_id = r.id AND m.date = CURRENT_DATE AND NOW()::time BETWEEN m.start_time AND m.end_time
-                    ) THEN 'Sibuk' ELSE 'Tersedia' 
-                END AS status,
-                (SELECT COUNT(*)::int FROM meetings m WHERE m.room_id = r.id AND m.date = CURRENT_DATE) AS today_meetings_count,
-                COALESCE(
-                    (SELECT json_agg(json_build_object(
-                        'id', m.id,
-                        'title', m.title,
-                        'date', m.date,
-                        'start_time', m.start_time,
-                        'end_time', m.end_time,
-                        'organizer_name', u.name
-                     ) ORDER BY m.date ASC, m.start_time ASC)
-                     FROM meetings m
-                     LEFT JOIN users u ON m.created_by = u.id
-                     WHERE m.room_id = r.id AND m.date >= CURRENT_DATE
-                    ), '[]'
-                ) AS meetings
-            FROM rooms r
-            WHERE r.id = $1;
-        `;
-        const result = await pool.query(queryText, [id]);
-        if (result.rows.length === 0) return res.status(404).json({ message: 'Room not found' });
-        
-        res.status(200).json({ status: 'Success', room: result.rows[0] });
-    } catch (error) {
-        console.log(error.message);
-        res.status(500).json({ error: 'Error in getRoomDetails controller' });
+        const room = await Room.findOne({ id });
+        if (!room) return res.status(404).json({ message: 'Room not found' });
 
+        const occupiedRoomIds = await Meeting.findOccupiedRoomIds();
+        const meetingDetails = await Meeting.findDetailsByRoom(id);
+
+        const comprehensiveRoomData = {
+            ...room,
+            status: occupiedRoomIds.includes(room.id) ? 'Sibuk' : 'Tersedia',
+            today_meetings_count: meetingDetails.today_meetings_count,
+            meetings: meetingDetails.meetings_list
+        };
+
+        res.status(200).json({ status: 'Success', room: comprehensiveRoomData });
+    } catch (error) {
+        console.error("Error in getRoomDetails Controller:", error.message);
+        res.status(500).json({ error: 'Error in getRoomDetails controller' });
     }
 };
 
 export const getRoomById = async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await pool.query('SELECT * FROM rooms WHERE id = $1', [id]);
-
-        if (result.rowCount === 0) {
-            return res.status(404).json({ message: 'Room not found' });
-        }
-
-        res.status(200).json({
-            status: 'Success',
-            room: result.rows[0]
-        });
+        const room = await Room.findOne({ id });
+        if (!room) return res.status(404).json({ message: 'Room not found' });
+        res.status(200).json({ status: 'Success', room });
     } catch (error) {
-        console.error(error.message);
+        console.error("Error in getRoomById Controller:", error.message);
         res.status(500).json({ error: 'Error in getRoomById controller' });
     }
 };
 
 export const createRoom = async (req, res) => {
     const { name, capacity, location_details } = req.body;
-
-    if (!name || !capacity) {
-        return res.status(400).json({ message: 'Room name and capacity are required' });
-    }
+    if (!name || !capacity) return res.status(400).json({ message: 'Room name and capacity are required' });
 
     try {
-        const roomExists = await pool.query('SELECT * FROM rooms WHERE name = $1', [name]);
-        if (roomExists.rowCount > 0) {
-            return res.status(400).json({ message: 'Room name already exists' });
-        }
+        const result = await Room.create({ name, capacity, location_details });
+        if (!result.success && result.type === 'ALREADY_EXISTS') return res.status(400).json({ message: 'Room name already exists' });
 
-        const queryText = `
-            INSERT INTO rooms (name, capacity, location_details) 
-            VALUES ($1, $2, $3) 
-            RETURNING *
-        `;
-        const newRoom = await pool.query(queryText, [name, capacity, location_details || null]);
-
-        res.status(201).json({
-            message: 'Room created successfully',
-            room: newRoom.rows[0]
-        });
+        res.status(201).json({ message: 'Room created successfully', room: result.room });
     } catch (error) {
-        console.error(error.message);
+        console.error("Error in createRoom:", error.message);
         res.status(500).json({ error: 'Error in createRoom controller' });
     }
 };
@@ -131,30 +72,14 @@ export const createRoom = async (req, res) => {
 export const updateRoom = async (req, res) => {
     const { id } = req.params;
     const { name, capacity, location_details } = req.body;
-
-    if (!name || !capacity) {
-        return res.status(400).json({ message: 'Room name and capacity are required' });
-    }
+    if (!name || !capacity) return res.status(400).json({ message: 'Room name and capacity are required' });
 
     try {
-        const queryText = `
-            UPDATE rooms 
-            SET name = $1, capacity = $2, location_details = $3, updated_at = NOW() 
-            WHERE id = $4 
-            RETURNING *
-        `;
-        const result = await pool.query(queryText, [name, capacity, location_details || null, id]);
-
-        if (result.rowCount === 0) {
-            return res.status(404).json({ message: 'Room not found' });
-        }
-
-        res.status(200).json({
-            message: 'Room updated successfully',
-            room: result.rows[0]
-        });
+        const updatedRoom = await Room.update(id, { name, capacity, location_details });
+        if (!updatedRoom) return res.status(404).json({ message: 'Room not found' });
+        res.status(200).json({ message: 'Room updated successfully', room: updatedRoom });
     } catch (error) {
-        console.error(error.message);
+        console.error("Error in updateRoom:", error.message);
         res.status(500).json({ error: 'Error in updateRoom controller' });
     }
 };
@@ -162,54 +87,26 @@ export const updateRoom = async (req, res) => {
 export const deleteRoom = async (req, res) => {
     const { id } = req.params;
     const client = await pool.connect();
-
     try {
         await client.query('BEGIN');
-
-        const checkFutureMeetingsQuery = `
-            SELECT COUNT(*)::int AS future_count 
-            FROM meetings 
-            WHERE room_id = $1 
-              AND (
-                date > CURRENT_DATE 
-                OR (date = CURRENT_DATE AND end_time > NOW()::time)
-              )
-        `;
-        const checkResult = await client.query(checkFutureMeetingsQuery, [id]);
-        const futureMeetingsCount = checkResult.rows[0].future_count;
-
+        const futureMeetingsCount = await Meeting.countFutureByRoom(client, id);
         if (futureMeetingsCount > 0) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ 
-                message: `Tidak dapat menghapus ruangan. Masih terdapat ${futureMeetingsCount} agenda rapat mendatang yang dijadwalkan di ruangan ini.` 
-            });
+            return res.status(400).json({ message: `Tidak dapat menghapus ruangan. Masih terdapat ${futureMeetingsCount} agenda rapat mendatang.` });
         }
 
-        const detachPastMeetingsQuery = `
-            UPDATE meetings 
-            SET room_id = NULL 
-            WHERE room_id = $1
-        `;
-        await client.query(detachPastMeetingsQuery, [id]);
-
-        const deleteRoomQuery = 'DELETE FROM rooms WHERE id = $1 RETURNING *';
-        const deleteResult = await client.query(deleteRoomQuery, [id]);
-
-        if (deleteResult.rowCount === 0) {
+        await Meeting.detachPastByRoom(client, id);
+        const deletedRoom = await Room.deleteRaw(client, id);
+        if (!deletedRoom) {
             await client.query('ROLLBACK');
             return res.status(404).json({ message: 'Ruangan tidak ditemukan.' });
         }
 
         await client.query('COMMIT');
-
-        res.status(200).json({
-            message: 'Ruangan berhasil dihapus secara permanen, riwayat rapat masa lalu telah diamankan.',
-            deletedRoom: deleteResult.rows[0]
-        });
-
+        res.status(200).json({ message: 'Ruangan berhasil dihapus secara permanen.', deletedRoom });
     } catch (error) {
         await client.query('ROLLBACK');
-        console.error("Error dalam deleteRoom controller:", error.message);
+        console.error("Error in deleteRoom:", error.message);
         res.status(500).json({ error: 'Internal Server Error pada penghapusan ruangan' });
     } finally {
         client.release();

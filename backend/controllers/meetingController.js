@@ -1,54 +1,16 @@
-import pool from '../utils/db.js';
+import { Meeting } from '../models/meetingModel.js';
+import { Attendance } from '../models/attendanceModel.js';
+import { Notification } from '../models/notificationModel.js';
 import { isPastDate } from '../utils/dateHelper.js';
+import pool from '../utils/db.js';
 
 export const getMeetings = async (req, res) => {
     const { id: userId, role: userRole } = req.user;
     try {
-        const queryTextBase = `
-            SELECT
-                m.*,
-                r.name AS room_name,
-                r.location_details AS room_location,
-                u.name AS creator_name,
-                u.email AS creator_email
-            FROM meetings m
-            LEFT JOIN rooms r ON m.room_id = r.id
-            LEFT JOIN users u ON m.created_by = u.id
-        `;
-
-        let queryText = queryTextBase;
-        let queryParams = [];
-
-        if (userRole === 'admin') {
-            queryText += 'ORDER BY m.date DESC, m.start_time ASC;';
-        }
-        else if (userRole === 'operator') {
-            queryText += ` 
-                LEFT JOIN attendance a ON m.id = a.meeting_id
-                WHERE m.created_by = $1 OR a.user_id = $1
-                GROUP BY m.id, r.id, u.id
-                ORDER BY m.date DESC, m.start_time ASC;
-            `;
-            queryParams.push(userId);
-        }
-        else {
-            queryText += ` 
-                INNER JOIN attendance a ON m.id = a.meeting_id
-                WHERE a.user_id = $1 AND m.status != 'cancelled'
-                ORDER BY m.date DESC, m.start_time ASC;
-            `;
-            queryParams.push(userId);
-        }
-
-        const result = await pool.query(queryText, queryParams);
-
-        res.status(200).json({
-            status: 'Success',
-            results: result.rows.length,
-            meetings: result.rows
-        })
+        const meetings = await Meeting.findAll({ userId, userRole });
+        res.status(200).json({ status: 'Success', results: meetings.length, meetings });
     } catch (error) {
-        console.error(error.message);
+        console.error("Error in getMeetings Controller:", error.message);
         res.status(500).json({ error: 'Error in getMeetings controller.' });
     }
 };
@@ -56,120 +18,44 @@ export const getMeetings = async (req, res) => {
 export const getMeetingDetails = async (req, res) => {
     const { id } = req.params;
     try {
-        const queryText = `
-            SELECT m.*, r.name AS room_name, u.name AS creator_name, u.profile_picture AS creator_picture
-            FROM meetings m
-            LEFT JOIN rooms r ON m.room_id = r.id
-            LEFT JOIN users u ON m.created_by = u.id
-            WHERE m.id = $1;
-        `;
-        const result = await pool.query(queryText, [id]);
-
-        if (result.rowCount === 0) {
-            return res.status(404).json({ message: 'Meeting not found' });
-        }
-
-        res.status(200).json({ status: 'Success', meeting: result.rows[0] });
+        const meeting = await Meeting.findOne({ id }, true);
+        if (!meeting) return res.status(404).json({ message: 'Meeting not found' });
+        res.status(200).json({ status: 'Success', meeting });
     } catch (error) {
-        console.error(error.message);
+        console.error("Error in getMeetingDetails Controller:", error.message);
         res.status(500).json({ error: 'Error in getMeetingDetails controller.' });
     }
 };
 
 export const createMeeting = async (req, res) => {
-    const {
-        title,
-        description,
-        date,
-        start_time,
-        end_time,
-        room_id,
-        online_link,
-        participant_ids
-    } = req.body;
+    const { title, description, date, start_time, end_time, room_id, online_link, participant_ids } = req.body;
 
-    if (!title || !date || !start_time || !end_time) {
-        return res.status(400).json({ message: 'Title, date, start time, and end time are required' });
-    }
-
-    if (isPastDate(date)) {
-        return res.status(400).json({ message: 'Cannot schedule a meeting on a past date' });
-    }
-
-    if (start_time >= end_time) {
-        return res.status(400).json({ message: 'Start time must be earlier than end time' });
-    }
+    if (!title || !date || !start_time || !end_time) return res.status(400).json({ message: 'Title, date, start time, and end time are required' });
+    if (isPastDate(date)) return res.status(400).json({ message: 'Cannot schedule a meeting on a past date' });
+    if (start_time >= end_time) return res.status(400).json({ message: 'Start time must be earlier than end time' });
 
     const client = await pool.connect();
-
     try {
         await client.query('BEGIN');
+        const result = await Meeting.create(client, { title, description, date, start_time, end_time, room_id, online_link, createdBy: req.user.id });
 
-        if (room_id) {
-            const overlapCheckText = `
-                SELECT * FROM meetings
-                WHERE room_id = $1
-                    AND date = $2
-                    AND status != 'canceled'
-                    AND (
-                        (start_time <= $3 AND end_time > $3) OR
-                        (start_time < $4 AND end_time >= $4) OR  
-                        (start_time >= $3 AND end_time <= $4)
-                    );
-            `;
-            const overlapCheck = await client.query(
-                overlapCheckText, [room_id, date, start_time, end_time]
-            );
-
-            if (overlapCheck.rowCount > 0) {
-                await client.query('ROLLBACK');
-                return res.status(400).json({ message: 'Room is already reserved for another meeting.' });
-            }
+        if (!result.success && result.type === 'ROOM_CONFLICT') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'Room is already reserved for another meeting.' });
         }
-
-        const insertMeetingText = `
-            INSERT INTO meetings (title, description, date, start_time, end_time, room_id, online_link, created_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING *;
-        `;
-        const newMeeting = await client.query(insertMeetingText, [
-            title, 
-            description || null, 
-            date, 
-            start_time, 
-            end_time, 
-            room_id || null, 
-            online_link || null, 
-            req.user.id
-        ]);
-        const meetingData = newMeeting.rows[0];
 
         if (participant_ids && Array.isArray(participant_ids) && participant_ids.length > 0) {
-            const insertAttendanceText = `
-                INSERT INTO attendance (meeting_id, user_id, status)
-                SELECT $1, unnest($2::int[]), 'absent';
-            `;
-            await client.query(insertAttendanceText, [meetingData.id, participant_ids]);
-
-            const insertNotificationText = `
-                INSERT INTO notifications (sender_id, receiver_id, type)
-                SELECT
-                    $1::int,    
-                    unnest($2::int[]),
-                    $3::varchar;
-            `;
-            const notifType = `invitation`;
-            await client.query(insertNotificationText, [req.user.id, participant_ids, notifType]);
+            await Attendance.createMass(client, result.meeting.id, participant_ids);
+            await Notification.createMass(client, {
+                senderId: req.user.id, receiverIds: participant_ids, type: 'invitation', message: `Anda diundang ke agenda rapat baru: "${title}"`
+            });
         }
-        await client.query('COMMIT');
 
-        res.status(201).json({
-            message: 'Meeting scheduled successfully',
-            meeting: newMeeting.rows[0]
-        })
+        await client.query('COMMIT');
+        res.status(201).json({ message: 'Meeting scheduled successfully', meeting: result.meeting });
     } catch (error) {
         await client.query('ROLLBACK');
-        console.error(error.message);
+        console.error("Error in createMeeting Controller transaction:", error.message);
         res.status(500).json({ error: 'Error in createMeeting controller' });
     } finally {
         client.release();
@@ -178,145 +64,49 @@ export const createMeeting = async (req, res) => {
 
 export const updateMeeting = async (req, res) => {
     const { id } = req.params;
-    const { 
-        title, 
-        description, 
-        date, 
-        start_time, 
-        end_time, 
-        room_id, 
-        online_link, 
-        status,
-        participant_ids
-    } = req.body;
+    const { title, description, date, start_time, end_time, room_id, online_link, status, participant_ids } = req.body;
+
+    if (date && isPastDate(date)) return res.status(400).json({ message: 'Cannot update meeting to a past date.' });
+    if (start_time && end_time && start_time >= end_time) return res.status(400).json({ message: 'Start time must be earlier than end time' });
 
     const client = await pool.connect();
-
     try {
         await client.query('BEGIN');
+        const result = await Meeting.update(client, id, { title, description, date, start_time, end_time, room_id, online_link, status }, { userId: req.user.id, userRole: req.user.role });
 
-        const meetingResult = await client.query('SELECT * FROM meetings WHERE id = $1', [id]);
-        if (meetingResult.rowCount === 0) {
+        if (!result.success) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ message: 'Meeting not found' });
+            if (result.type === 'NOT_FOUND') return res.status(404).json({ message: 'Meeting not found' });
+            if (result.type === 'UNAUTHORIZED') return res.status(403).json({ message: 'Unauthorized to update this meeting schedule' });
+            if (result.type === 'COMPLETED_LOCKED') return res.status(400).json({ message: 'This meeting has already been completed and locked.' });
+            if (result.type === 'ROOM_CONFLICT') return res.status(400).json({ message: 'Room booking conflict with another scheduled meeting.' });
         }
 
-        const meeting = meetingResult.rows[0];
+        if (participant_ids && Array.isArray(participant_ids) && participant_ids.length > 0) {
+            await Attendance.upsertMass(client, id, participant_ids);
 
-        if (meeting.created_by !== req.user.id && req.user.role !== 'admin') {
-            await client.query('ROLLBACK');
-            return res.status(403).json({ message: 'Unauthorized to update this meeting schedule' });
-        }
-
-        if (meeting.status === 'completed') {
-            await client.query('ROLLBACK');
-            return res.status(400).json({ message: 'This meeting has already been completed and locked.' });
-        }
-
-        if (date && isPastDate(date)) {
-            await client.query('ROLLBACK');
-            return res.status(400).json({ message: 'Cannot update meeting to a past date.' });
-        }
-
-        const finalStatus = status || meeting.status;
-
-        if (room_id !== null && (finalStatus === 'scheduled' || finalStatus === 'ongoing')){
-            const actualRoomId = room_id !== undefined ? room_id : meeting.room_id;
-
-            if (actualRoomId) {
-                const overlapCheckText = `
-                    SELECT * FROM meetings 
-                    WHERE room_id = $1 
-                        AND date = $2
-                        AND id != $3
-                        AND status != 'canceled'
-                        AND (
-                            (start_time <= $4 AND end_time > $4) OR
-                            (start_time < $5 AND end_time >= $5) OR
-                            (start_time >= $4 AND end_time <= $5)
-                        );
-                `;
-                const overlapCheck = await client.query(overlapCheckText, [
-                    actualRoomId, 
-                    date || meeting.date, 
-                    id, 
-                    start_time || meeting.start_time, 
-                    end_time || meeting.end_time
-                ]);
-
-                if (overlapCheck.rowCount > 0) {
-                    return res.status(400).json({ message: 'Room booking conflict with another scheduled meeting.' });
-                }
-            }
-        }
-        
-        const queryText = `
-            UPDATE meetings 
-            SET 
-                title = $1, 
-                description = $2, 
-                date = $3, 
-                start_time = $4, 
-                end_time = $5, 
-                room_id = $6, 
-                online_link = $7,
-                status = $8
-            WHERE id = $9
-            RETURNING *;
-        `;
-        const updatedResult = await client.query(queryText, [
-            title || meeting.title, 
-            description !== undefined ? description : meeting.description, 
-            date || meeting.date, 
-            start_time || meeting.start_time, 
-            end_time || meeting.end_time, 
-            room_id !== undefined ? room_id : meeting.room_id, 
-            online_link !== undefined ? online_link : meeting.online_link,
-            finalStatus,
-            id
-        ]);
-
-        if (participant_ids && Array.isArray(participant_ids)) {
-            const insertAttendanceText = `
-                INSERT INTO attendance (meeting_id, user_id, status)
-                SELECT $1, unnest($2::int[]), 'absent'
-                ON CONFLICT (meeting_id, user_id) DO NOTHING;
-            `;
-            await client.query(insertAttendanceText, [id, participant_ids]);
-
-            const insertNotificationText = `
-                INSERT INTO notifications (sender_id, receiver_id, type, message)
-                SELECT
-                    $1::int,
-                    unnest($2::int[]),
-                    $3::varchar,
-                    $4::text;
-            `;
             let notifType = 'update';
-            let message = ''
-
-            if (status && status === 'ongoing') {
+            let dynamicMsg = `Jadwal rapat "${title || result.meeting.title}" telah diperbarui.`;
+            
+            if (status === 'ongoing') {
                 notifType = 'start';
-            } 
-            else if (status && status === 'canceled') {
+                dynamicMsg = `Rapat "${title || result.meeting.title}" telah dimulai. Silakan segera bergabung!`;
+            } else if (status === 'canceled' || status === 'cancelled') {
                 notifType = 'canceled';
-            } 
-            else if (start_time || end_time || date) {
+                dynamicMsg = `Rapat "${title || result.meeting.title}" telah dibatalkan oleh pihak penyelenggara.`;
+            } else if (start_time || end_time || date) {
                 notifType = 'reschedule';
+                dynamicMsg = `Rapat "${title || result.meeting.title}" mengalami perubahan jadwal pelaksanaan.`;
             }
 
-            await client.query(insertNotificationText, [req.user.id, participant_ids, notifType, message]);
+            await Notification.createMass(client, { senderId: req.user.id, receiverIds: participant_ids, type: notifType, message: dynamicMsg });
         }
 
         await client.query('COMMIT');
-
-        res.status(200).json({
-            message: 'Meeting updated successfully',
-            meeting: updatedResult.rows[0]
-        });
+        res.status(200).json({ message: 'Meeting updated successfully', meeting: result.meeting });
     } catch (error) {
         await client.query('ROLLBACK');
-        console.error(error.message);
+        console.error("Error in updateMeeting Controller transaction:", error.message);
         res.status(500).json({ error: 'Error in updateMeeting controller' });
     } finally {
         client.release();
@@ -326,27 +116,16 @@ export const updateMeeting = async (req, res) => {
 export const deleteMeeting = async (req, res) => {
     const { id } = req.params;
     try {
-        const meetingResult = await pool.query('SELECT * FROM meetings WHERE id = $1', [id]);
-        if (meetingResult.rowCount === 0) {
-            return res.status(404).json({ message: 'Meeting not found' });
-        }
+        const result = await Meeting.delete(id, { userId: req.user.id, userRole: req.user.role });
 
-        if (meetingResult.rows[0].created_by !== req.user.id && req.user.role !== 'admin') {
-            return res.status(403).json({ message: 'Unauthorized to cancel this meeting' });
+        if (!result.success) {
+            if (result.type === 'NOT_FOUND') return res.status(404).json({ message: 'Meeting not found' });
+            if (result.type === 'UNAUTHORIZED') return res.status(403).json({ message: 'Unauthorized to cancel this meeting' });
+            if (result.type === 'NOT_CANCELED') return res.status(400).json({ message: 'Cannot delete an active meeting. Please cancel the meeting status first.' });
         }
-        
-        const meeting = meetingResult.rows[0];
-
-        if (meeting.status !== 'canceled') {
-            return res.status(400).json({ 
-                message: 'Cannot delete an active meeting. Please cancel the meeting status first before deleting it permanently.' 
-            });
-        }
-
-        await pool.query('DELETE FROM meetings WHERE id = $1', [id]);
         res.status(200).json({ message: 'Meeting deleted successfully from database' });
     } catch (error) {
-        console.error(error.message);
+        console.error("Error in deleteMeeting Controller:", error.message);
         res.status(500).json({ error: 'Error in deleteMeeting controller' });
     }
 };
