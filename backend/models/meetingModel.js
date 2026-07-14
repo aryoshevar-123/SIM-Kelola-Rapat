@@ -1,7 +1,6 @@
 import pool from '../utils/db.js';
 
 export const Meeting = {
-    // 🔍 Ambil seluruh rapat berdasarkan segmentasi hak akses pengguna (Role-Based)
     findAll: async ({ userId, userRole }) => {
         let queryText = `
             SELECT
@@ -36,7 +35,6 @@ export const Meeting = {
         return result.rows;
     },
 
-    // 🎯 Pencarian Detail Rapat Tunggal
     findOne: async (criteria, includeDetails = false) => {
         let queryText = includeDetails
             ? `SELECT m.*, r.name AS room_name, u.name AS creator_name, u.profile_picture AS creator_picture FROM meetings m LEFT JOIN rooms r ON m.room_id = r.id LEFT JOIN users u ON m.created_by = u.id WHERE `
@@ -54,7 +52,6 @@ export const Meeting = {
         return result.rows[0];
     },
 
-    // ➕ Kueri Tambah Rapat (Menerima Klien Transaksi dari Controller)
     create: async (client, { title, description, date, start_time, end_time, room_id, online_link, createdBy }) => {
         if (room_id) {
             const overlapCheckText = `
@@ -76,7 +73,6 @@ export const Meeting = {
         return { success: true, meeting: result.rows[0] };
     },
 
-    // ✏️ Kueri Perbaruan Rapat (Menerima Klien Transaksi dari Controller)
     update: async (client, id, { title, description, date, start_time, end_time, room_id, online_link, status }, { userId, userRole }) => {
         const meetingResult = await client.query('SELECT * FROM meetings WHERE id = $1 FOR UPDATE', [id]);
         if (meetingResult.rowCount === 0) return { success: false, type: 'NOT_FOUND' };
@@ -114,7 +110,6 @@ export const Meeting = {
         return { success: true, meeting: updatedResult.rows[0] };
     },
 
-    // 🗑️ Hapus Rapat Permanen
     delete: async (id, { userId, userRole }) => {
         const meeting = await Meeting.findOne({ id });
         if (!meeting) return { success: false, type: 'NOT_FOUND' };
@@ -125,11 +120,6 @@ export const Meeting = {
         return { success: true };
     },
 
-    // ==========================================
-    // ⚡ INTER-DOMAIN HELPERS (UNTUK DOMAIN ROOM)
-    // ==========================================
-
-    // 🏁 Ambil list ID Ruangan yang sedang terpakai saat ini (Real-time status)
     findOccupiedRoomIds: async () => {
         const queryText = `
             SELECT DISTINCT room_id FROM meetings 
@@ -139,7 +129,6 @@ export const Meeting = {
         return result.rows.map(row => row.room_id);
     },
 
-    // 📊 Ambil tumpukan agenda rapat mendatang khusus milik satu ruangan
     findDetailsByRoom: async (roomId) => {
         const queryText = `
             SELECT 
@@ -157,7 +146,6 @@ export const Meeting = {
         return result.rows[0] || { today_meetings_count: 0, meetings_list: [] };
     },
 
-    // 🔢 Hitung agenda rapat masa depan (Untuk validasi penghapusan ruangan)
     countFutureByRoom: async (client, roomId) => {
         const queryText = `
             SELECT COUNT(*)::int AS future_count FROM meetings 
@@ -167,7 +155,6 @@ export const Meeting = {
         return result.rows[0].future_count;
     },
 
-    // 🔗 Putus relasi (Set NULL) rapat masa lalu jika ruangan dihapus
     detachPastByRoom: async (client, roomId) => {
         await client.query('UPDATE meetings SET room_id = NULL WHERE room_id = $1;', [roomId]);
     }

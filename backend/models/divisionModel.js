@@ -1,7 +1,6 @@
 import pool from '../utils/db.js';
 
 export const Division = {
-    // 🔍 Ambil seluruh divisi dengan akumulasi total anggotanya
     findAll: async () => {
         const queryText = `
             SELECT
@@ -16,7 +15,6 @@ export const Division = {
         return result.rows;
     },
 
-    // 🎯 UNIFIED LOOKUP: Cari satu divisi berdasarkan id atau name
     findOne: async (criteria, includeMembers = false) => {
         let queryText = '';
         const values = [];
@@ -59,7 +57,6 @@ export const Division = {
         return result.rows[0];
     },
 
-    // ➕ Tambah Divisi Baru & Alokasi Anggota Massal (Transaction)
     create: async ({ name, description, employeeIds }) => {
         const client = await pool.connect();
         try {
@@ -98,7 +95,6 @@ export const Division = {
         }
     },
 
-    // ✏️ Perbarui Data Divisi & Sinkronisasi Anggota Massal (Transaction)
     update: async (id, { name, description, addUserIds, removeUserIds }) => {
         const client = await pool.connect();
         try {
@@ -146,7 +142,6 @@ export const Division = {
         }
     },
 
-    // 🗑️ Hapus Divisi
     delete: async (id) => {
         try {
             const result = await pool.query('DELETE FROM divisions WHERE id = $1 RETURNING *', [id]);

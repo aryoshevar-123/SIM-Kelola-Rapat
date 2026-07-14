@@ -1,7 +1,6 @@
 import pool from "../utils/db.js";
 
 export const Attendance = {
-    // 🔍 Ambil daftar absensi per Rapat
     findAllByMeeting: async (meetingId) => {
         const queryText = `
             SELECT
@@ -16,7 +15,6 @@ export const Attendance = {
         return result.rows;
     },
 
-    // 🎯 Ambil detail absensi tunggal dengan informasi rapat pembungkusnya
     findOneWithMeetingContext: async (id) => {
         const queryText = `
             SELECT a.*, m.status AS meeting_status, m.created_by
@@ -28,7 +26,6 @@ export const Attendance = {
         return result.rows[0];
     },
 
-    // ✏️ Ganti Status Presensi Karyawan secara individual
     update: async (id, status) => {
         const queryText = `
             UPDATE attendance 
@@ -40,7 +37,6 @@ export const Attendance = {
         return result.rows[0];
     },
 
-    // ⚡ INJEKSI MASSAL: Menyimpan data absensi peserta baru saat rapat dibuat (Transaction)
     createMass: async (client, meetingId, userIds) => {
         const queryText = `
             INSERT INTO attendance (meeting_id, user_id, status)
@@ -49,7 +45,6 @@ export const Attendance = {
         await client.query(queryText, [meetingId, userIds]);
     },
 
-    // ⚡ UPSERT MASSAL: Mencegah error duplikasi baris saat melakukan update peserta rapat (Transaction)
     upsertMass: async (client, meetingId, userIds) => {
         const queryText = `
             INSERT INTO attendance (meeting_id, user_id, status)

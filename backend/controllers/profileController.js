@@ -58,7 +58,6 @@ export const updateMyPassword = async (req, res) => {
         const isMatch = await bcrypt.compare(current_password, user.password);
         if (!isMatch) return res.status(400).json({ message: 'Incorrect current password' });
 
-        // Kirim text murni, auto-bcrypt diproses otomatis di dalam Model
         await User.update(req.user.id, { password: new_password });
         res.status(200).json({ message: 'Password updated successfully' });
     } catch (error) {
