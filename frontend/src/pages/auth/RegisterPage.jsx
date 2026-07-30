@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiUser, FiMail, FiLock, FiEye, FiEyeOff } from 'react-icons/fi';
+import { useMutation } from '@tanstack/react-query';
+import axios from 'axios';
+import { FiUser, FiMail, FiLock, FiEye, FiEyeOff, FiAlertCircle } from 'react-icons/fi';
+import { useToast } from '../../context/ToastContext.jsx';
+import ConfirmationModal from '../../components/common/ConfirmationModal';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
-  // 1. State Form Input
+  // 📝 State Form Input
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -13,28 +18,71 @@ export default function RegisterPage() {
     confirmPassword: ''
   });
 
-  // 2. State Toggle Tampilan Sandi
+  // 🔮 State Kendali UI & Validasi
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [serverError, setServerError] = useState('');
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    // Hapus error field ketika user mulai mengetik ulang
+    if (errors[e.target.name]) {
+      setErrors(prev => ({ ...prev, [e.target.name]: null }));
+    }
+  };
+
+  // 📡 MUTASI DATA: POST /api/auth/register
+  const { mutate: registerAccount, isPending } = useMutation({
+    mutationFn: async (registrationData) => {
+      const response = await axios.post('/api/auth/register', registrationData);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      setIsModalOpen(false);
+      showToast(data.message || "Pendaftaran akun berhasil! Silakan login.", "success");
+      navigate('/login');
+    },
+    onError: (error) => {
+      setIsModalOpen(false);
+      const msg = error.response?.data?.message || "Gagal melakukan registrasi akun.";
+      setServerError(msg);
+      showToast(msg, "error");
+    }
+  });
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.name.trim()) newErrors.name = "Nama lengkap wajib diisi!";
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.email.trim()) {
+      newErrors.email = "Alamat email wajib diisi!";
+    } else if (!emailRegex.test(formData.email)) {
+      newErrors.email = "Format alamat email tidak valid!";
+    }
+    
+    if (!formData.password) {
+      newErrors.password = "Kata sandi wajib diisi!";
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Kata sandi minimal 8 karakter!";
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = "Konfirmasi kata sandi tidak cocok!";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
-    // Validasi Kesesuaian Kata Sandi
-    if (formData.password !== formData.confirmPassword) {
-      alert("Konfirmasi kata sandi tidak cocok dengan kata sandi baru!");
-      return;
+    setServerError('');
+    if (validateForm()) {
+      setIsModalOpen(true);
     }
-
-    console.log("Mencoba Mendaftar Akun dengan data:", formData);
-    alert("Pendaftaran berhasil! Silakan masuk menggunakan akun Anda.");
-    
-    // 🔥 Alihkan pengguna ke halaman login setelah berhasil mendaftar
-    navigate('/login');
   };
 
   return (
@@ -53,6 +101,14 @@ export default function RegisterPage() {
           </p>
         </div>
 
+        {/* Notifikasi Error Global Server Backend */}
+        {serverError && (
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-rose-600 text-xs font-semibold">
+            <FiAlertCircle className="w-4 h-4 shrink-0" />
+            <span>{serverError}</span>
+          </div>
+        )}
+
         {/* Form Registrasi Utama */}
         <form onSubmit={handleSubmit} className="space-y-3.5">
           
@@ -64,15 +120,17 @@ export default function RegisterPage() {
                 <FiUser className="w-4 h-4" />
               </span>
               <input 
+                disabled={isPending}
                 type="text"
                 name="name"
                 required
                 placeholder="Nama Lengkap"
                 value={formData.name}
                 onChange={handleInputChange}
-                className="w-full pl-9 pr-4 py-2 bg-slate-50/50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-brand focus:bg-white transition-all duration-150"
+                className="w-full pl-9 pr-4 py-2 bg-slate-50/50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-brand focus:bg-white transition-all duration-150 disabled:bg-slate-100"
               />
             </div>
+            {errors.name && <p className="text-[10px] text-rose-500 font-bold">{errors.name}</p>}
           </div>
 
           {/* ✉️ Field Input Email */}
@@ -83,15 +141,17 @@ export default function RegisterPage() {
                 <FiMail className="w-4 h-4" />
               </span>
               <input 
-                type="email"
+                disabled={isPending}
+                type="text"
                 name="email"
                 required
                 placeholder="Email"
                 value={formData.email}
                 onChange={handleInputChange}
-                className="w-full pl-9 pr-4 py-2 bg-slate-50/50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-brand focus:bg-white transition-all duration-150"
+                className="w-full pl-9 pr-4 py-2 bg-slate-50/50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-brand focus:bg-white transition-all duration-150 disabled:bg-slate-100"
               />
             </div>
+            {errors.email && <p className="text-[10px] text-rose-500 font-bold">{errors.email}</p>}
           </div>
 
           {/* 🔒 Field Input Kata Sandi */}
@@ -102,22 +162,24 @@ export default function RegisterPage() {
                 <FiLock className="w-4 h-4" />
               </span>
               <input 
+                disabled={isPending}
                 type={showPassword ? "text" : "password"}
                 name="password"
                 required
-                placeholder="Minimal 8 karakter"
+                placeholder="Minimal 6 karakter"
                 value={formData.password}
                 onChange={handleInputChange}
-                className="w-full pl-9 pr-10 py-2 bg-slate-50/50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-brand focus:bg-white transition-all duration-150"
+                className="w-full pl-9 pr-10 py-2 bg-slate-50/50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-brand focus:bg-white transition-all duration-150 disabled:bg-slate-100"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
-                {showPassword ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
+                {showPassword ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4"/>}
               </button>
             </div>
+            {errors.password && <p className="text-[10px] text-rose-500 font-bold">{errors.password}</p>}
           </div>
 
           {/* 🔒 Field Input Konfirmasi Kata Sandi */}
@@ -128,30 +190,33 @@ export default function RegisterPage() {
                 <FiLock className="w-4 h-4" />
               </span>
               <input 
+                disabled={isPending}
                 type={showConfirmPassword ? "text" : "password"}
                 name="confirmPassword"
                 required
                 placeholder="Ulangi kata sandi"
                 value={formData.confirmPassword}
                 onChange={handleInputChange}
-                className="w-full pl-9 pr-10 py-2 bg-slate-50/50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-brand focus:bg-white transition-all duration-150"
+                className="w-full pl-9 pr-10 py-2 bg-slate-50/50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-brand focus:bg-white transition-all duration-150 disabled:bg-slate-100"
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
-                {showConfirmPassword ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
+                {showConfirmPassword ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4"/>}
               </button>
             </div>
+            {errors.confirmPassword && <p className="text-[10px] text-rose-500 font-bold">{errors.confirmPassword}</p>}
           </div>
 
           {/* 🚀 Tombol Submit */}
           <button 
             type="submit"
-            className="w-full py-2.5 bg-brand text-white text-sm font-semibold rounded-lg hover:bg-brand-hover transition-colors shadow-xs cursor-pointer mt-3"
+            disabled={isPending}
+            className="w-full py-2.5 bg-brand text-white text-sm font-semibold rounded-lg hover:bg-brand-hover transition-colors shadow-xs cursor-pointer mt-3 disabled:bg-slate-300"
           >
-            Daftar Akun
+            {isPending ? "Mendaftarkan..." : "Daftar Akun"}
           </button>
         </form>
 
@@ -159,7 +224,7 @@ export default function RegisterPage() {
         <div className="text-center text-xs text-slate-500 pt-2 border-t border-slate-100">
           Sudah terdaftar sebagai karyawan?{" "}
           <span 
-            onClick={() => navigate('/login')}
+            onClick={() => !isPending && navigate('/login')}
             className="text-brand font-bold hover:underline cursor-pointer"
           >
             Masuk Sekarang
@@ -167,6 +232,22 @@ export default function RegisterPage() {
         </div>
 
       </div>
+
+      {/* 🏛️ Modal Dialog Proteksi Konfirmasi Data */}
+      <ConfirmationModal
+        type="brand"
+        isOpen={isModalOpen}
+        isPending={isPending}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={() => registerAccount({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password
+        })}
+        title="Konfirmasi Registrasi Akun"
+        message="Pastikan nama lengkap dan email korporasi yang Anda masukkan sudah benar sebelum membuat akun."
+        confirmLabel="Ya, Daftarkan"
+      />
 
     </div>
   );
