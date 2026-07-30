@@ -6,25 +6,20 @@ export default function Table({
   data = [], 
   totalItems = 0, 
   currentPage = 1, 
-  onPageChange,           // Fungsi untuk mengubah halaman dari parent component
-  itemsPerPage = 10       // Default 10 data per halaman sesuai keinginanmu
+  onPageChange,           
+  itemsPerPage = 10       
 }) {
   
-  // 🧮 1. Logika Perhitungan Pagination
   const totalPages = Math.ceil(data.length / itemsPerPage) || 1;
-  
-  // Hitung indeks data awal dan akhir untuk halaman yang aktif saat ini
+
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   
-  // Potong data asli agar hanya menampilkan maksimal 10 data untuk halaman berjalan
   const currentData = data.slice(indexOfFirstItem, indexOfLastItem);
 
-  // Hitung teks info status baris (misal: Menampilkan 1-10 dari 11 data)
   const displayStart = data.length === 0 ? 0 : indexOfFirstItem + 1;
   const displayEnd = Math.min(indexOfLastItem, data.length);
 
-  // Membuat array nomor halaman untuk tombol angka (misal: [1, 2])
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   return (
@@ -35,7 +30,6 @@ export default function Table({
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               {columns.map((col, index) => (
-                /* 🔥 PERUBAHAN DI SINI: Menyuntikkan tbl-header secara otomatis untuk seluruh tabel */
                 <th 
                   key={index} 
                   className={`px-6 py-4 tbl-header ${col.className || ''}`}
@@ -69,14 +63,12 @@ export default function Table({
         </table>
       </div>
       
-      {/* Footer & Dynamic Pagination Index */}
       <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 text-xs text-slate-500 flex flex-col sm:flex-row justify-between items-center gap-4 select-none">
         <span className="font-medium">
           Menampilkan <strong className="text-slate-700">{displayStart}-{displayEnd}</strong> dari <strong className="text-slate-700">{data.length}</strong> data
         </span>
         
         <div className="flex items-center gap-2">
-          {/* Tombol Sebelumnya */}
           <button 
             disabled={currentPage === 1}
             onClick={() => onPageChange(currentPage - 1)}
@@ -85,7 +77,6 @@ export default function Table({
             <FiChevronLeft className="w-4 h-4" />
           </button>
 
-          {/* Render Angka Halaman secara Dinamis */}
           <div className="flex items-center gap-1">
             {pageNumbers.map((number) => (
               <button
@@ -102,7 +93,6 @@ export default function Table({
             ))}
           </div>
 
-          {/* Tombol Selanjutnya */}
           <button 
             disabled={currentPage === totalPages}
             onClick={() => onPageChange(currentPage + 1)}
