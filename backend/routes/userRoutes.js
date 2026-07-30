@@ -11,13 +11,14 @@ import { protectRoute, authorizeRoute } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.use(protectRoute, authorizeRoute('admin'));
+router.use(protectRoute);
 
 router.get('/', getUsers);
 router.get('/:id', getUserDetails);
-router.post('/', createUserByAdmin);
-router.put('/:id', updateUser);
-router.put('/:id/activate', toggleUserActivation);
-router.delete('/:id', deleteUser);
+
+router.post('/',  authorizeRoute('admin'), createUserByAdmin);
+router.put('/:id',  authorizeRoute('admin'), updateUser);
+router.put('/:id/activate',  authorizeRoute('admin'), toggleUserActivation);
+router.delete('/:id', authorizeRoute('admin'), deleteUser);
 
 export default router;
