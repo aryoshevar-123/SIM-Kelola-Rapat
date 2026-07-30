@@ -69,7 +69,7 @@ export const User = {
             hashedPassword,
             role || 'user',
             divisionId || null,
-            true
+            false
         ]);
         
         return result.rows[0];

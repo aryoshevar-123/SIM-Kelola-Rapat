@@ -24,7 +24,8 @@ export const registerUser = async (req, res) => {
             email: sanitizedEmail,
             password,
             role: 'user',
-            divisionId: null
+            divisionId: null,
+            is_active: false
         });
 
         res.status(201).json({ message: 'User registered successfully', user: newUser });
