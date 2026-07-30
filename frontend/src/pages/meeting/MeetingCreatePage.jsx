@@ -42,7 +42,7 @@ export default function MeetingCreatePage() {
   const { data: users = [] } = useQuery({
     queryKey: ['usersDropdown'],
     queryFn: async () => {
-      const response = await axios.get('/api/users');
+      const response = await axios.get('/api/users?status=active');
       return response.data.users || response.data;
     }
   });

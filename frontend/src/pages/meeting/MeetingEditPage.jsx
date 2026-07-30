@@ -10,12 +10,11 @@ import {
 import { useToast } from '../../context/ToastContext.jsx';
 
 export default function MeetingEditPage() {
-  const { id } = useParams(); // 🆔 Ambil ID Meeting dari URL
+  const { id } = useParams(); 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
-  // 📝 STATE INPUT FORM
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
@@ -23,12 +22,10 @@ export default function MeetingEditPage() {
   const [endTime, setEndTime] = useState('');
   const [status, setStatus] = useState('');
   
-  // 🔮 STATE HIBRIDA
   const [meetingType, setMeetingType] = useState('offline'); 
   const [roomId, setRoomId] = useState('');
   const [onlineLink, setOnlineLink] = useState('');
 
-  // 👥 STATE PESERTA
   const [selectedParticipants, setSelectedParticipants] = useState([]);
   const [searchParticipantQuery, setSearchParticipantQuery] = useState('');
 
@@ -36,7 +33,6 @@ export default function MeetingEditPage() {
   const [serverError, setServerError] = useState('');
   const [errors, setErrors] = useState({});
 
-  // 📡 1. FETCH DATA: Detail Rapat Utama
   const { data: meeting, isLoading: isLoadingMeeting } = useQuery({
     queryKey: ['meeting', id],
     queryFn: async () => {
@@ -45,7 +41,6 @@ export default function MeetingEditPage() {
     }
   });
 
-  // 📡 2. FETCH DATA: Daftar Ruangan
   const { data: rooms = [] } = useQuery({
     queryKey: ['roomsDropdown'],
     queryFn: async () => {
@@ -54,16 +49,14 @@ export default function MeetingEditPage() {
     }
   });
 
-  // 📡 3. FETCH DATA: Daftar Karyawan
   const { data: users = [] } = useQuery({
     queryKey: ['usersDropdown'],
     queryFn: async () => {
-      const response = await axios.get('/api/users');
+      const response = await axios.get('/api/users?status=active');
       return response.data.users || response.data;
     }
   });
 
-  // 📡 4. FETCH DATA: Partisipan Saat Ini (Attendance)
   const { data: currentAttendance = [] } = useQuery({
     queryKey: ['meetingAttendance', id],
     queryFn: async () => {
@@ -72,17 +65,24 @@ export default function MeetingEditPage() {
     }
   });
 
-  // 🔄 SINRONISASI DATA: Masukkan data DB ke State Form
   useEffect(() => {
     if (meeting) {
       setTitle(meeting.title || '');
       setDescription(meeting.description || '');
-      // Format tanggal YYYY-MM-DD untuk input date
-      setDate(meeting.date ? meeting.date.split('T')[0] : '');
-      // Format jam HH:mm untuk input time
+      setStatus(meeting.status || 'scheduled');
       setStartTime(meeting.start_time?.substring(0, 5) || '');
       setEndTime(meeting.end_time?.substring(0, 5) || '');
-      setStatus(meeting.status || 'scheduled');
+      
+      if (meeting.date) {
+        const dateObj = new Date(meeting.date);
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        
+        setDate(`${year}-${month}-${day}`); 
+      } else {
+        setDate('');
+      }
       
       if (meeting.room_id) {
         setMeetingType('offline');
@@ -96,7 +96,6 @@ export default function MeetingEditPage() {
     }
   }, [meeting]);
 
-  // Sync Partisipan
   useEffect(() => {
     if (currentAttendance.length > 0) {
       const ids = currentAttendance.map(a => a.user_id);
@@ -104,7 +103,6 @@ export default function MeetingEditPage() {
     }
   }, [currentAttendance]);
 
-  // 📡 5. MUTASI DATA: PUT /api/meetings/:id
   const { mutate: updateMeeting, isPending } = useMutation({
     mutationFn: async (updatedData) => {
       const response = await axios.put(`/api/meetings/${id}`, updatedData);
@@ -172,7 +170,6 @@ export default function MeetingEditPage() {
       <form onSubmit={(e) => { e.preventDefault(); if(!isCompleted && validateForm()) setIsModalOpen(true); }} className="bg-white border border-slate-200 rounded-2xl shadow-xs p-6 space-y-6">
         
         <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-          {/* Judul */}
           <div className="md:col-span-4 space-y-1.5">
             <label className="text-xs font-bold text-slate-600">Topik Utama Rapat</label>
             <input 
@@ -185,7 +182,6 @@ export default function MeetingEditPage() {
             {errors.title && <p className="text-[10px] text-rose-500 font-bold">{errors.title}</p>}
           </div>
 
-          {/* Status Rapat (🔥 Fitur Baru) */}
           <div className="md:col-span-2 space-y-1.5">
             <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
               Status Pelaksanaan
@@ -201,7 +197,6 @@ export default function MeetingEditPage() {
             </select>
           </div>
 
-          {/* Tanggal */}
           <div className="md:col-span-2 space-y-1.5">
             <label className="text-xs font-bold text-slate-600">Tanggal Pelaksanaan</label>
             <input 
@@ -213,7 +208,6 @@ export default function MeetingEditPage() {
             />
           </div>
 
-          {/* Jam */}
           <div className="md:col-span-2 space-y-1.5">
             <label className="text-xs font-bold text-slate-600">Alokasi Waktu (Mulai - Selesai)</label>
             <div className="flex items-center gap-2">
@@ -224,14 +218,12 @@ export default function MeetingEditPage() {
             {errors.time && <p className="text-[10px] text-rose-500 font-bold">{errors.time}</p>}
           </div>
 
-          {/* Deskripsi */}
           <div className="md:col-span-4 space-y-1.5">
             <label className="text-xs font-bold text-slate-600">Deskripsi Pembahasan</label>
             <textarea disabled={isCompleted} rows="3" value={description} onChange={(e) => setDescription(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none resize-none" />
           </div>
         </div>
 
-        {/* Metode Switching */}
         <div className="pt-4 border-t border-slate-100 space-y-4">
           <label className="text-xs font-bold text-slate-700">Metode & Lokasi</label>
           <div className="flex gap-2">
@@ -253,7 +245,6 @@ export default function MeetingEditPage() {
           )}
         </div>
 
-        {/* Partisipan */}
         <div className="pt-4 border-t border-slate-100 space-y-3">
           <label className="text-xs font-bold text-slate-700 flex items-center gap-2"><FiUsers className="text-brand"/> Kelola Partisipan</label>
           <div className="relative">
