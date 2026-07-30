@@ -20,21 +20,6 @@ export default function NotificationPage() {
   const notifications = notificationsData?.notifications || [];
   const unreadCount = notificationsData?.unread_count || 0;
 
-  // 📡 2. MUTASI DATA: Tandai Satu Notifikasi Dibaca
-  const { mutate: markAsRead } = useMutation({
-    mutationFn: async (id) => {
-      const response = await axios.put(`/api/notifications/${id}/read`);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    },
-    onError: (error) => {
-      const msg = error.response?.data?.message || "Gagal memperbarui status notifikasi.";
-      showToast(msg, "error");
-    }
-  });
-
   // 📡 3. MUTASI DATA: Tandai Semua Notifikasi Dibaca
   const { mutate: markAllAsRead, isPending: isMarkingAll } = useMutation({
     mutationFn: async () => {
@@ -193,22 +178,9 @@ export default function NotificationPage() {
 
                 {/* Kalimat Teks Pesan Utama Dari Backend */}
                 <p className={`text-sm leading-relaxed ${notif.is_read ? 'text-slate-600' : 'text-slate-800 font-medium'}`}>
-                  {notif.message || notif.title}
+                  {notif.message}
                 </p>
               </div>
-
-              {/* Konten Kanan: Aksi Mikro Cepat (Tandai Dibaca Individual) */}
-              {!notif.is_read && (
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 shrink-0">
-                  <button 
-                    onClick={() => markAsRead(notif.id)}
-                    title="Tandai dibaca"
-                    className="p-1 text-slate-400 hover:text-brand rounded-md hover:bg-slate-200/50 cursor-pointer"
-                  >
-                    <FiCheckCircle className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
 
             </div>
           ))

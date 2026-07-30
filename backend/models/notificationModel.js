@@ -3,9 +3,9 @@ import pool from "../utils/db.js";
 export const Notification = {
     findAllByUser: async (userId) => {
         const queryText = `
-            SELECT id, title, message, is_read, created_at
+            SELECT id, type, message, is_read, created_at
             FROM notifications
-            WHERE user_id = $1
+            WHERE receiver_id = $1
             ORDER BY created_at DESC;
         `;
         const result = await pool.query(queryText, [userId]);
@@ -13,7 +13,7 @@ export const Notification = {
     },
 
     countUnreadByUser: async (userId) => {
-        const queryText = 'SELECT COUNT(*)::int AS unread_count FROM notifications WHERE user_id = $1 AND is_read = FALSE';
+        const queryText = 'SELECT COUNT(*)::int AS unread_count FROM notifications WHERE receiver_id = $1 AND is_read = FALSE';
         const result = await pool.query(queryText, [userId]);
         return result.rows[0].unread_count;
     },
@@ -21,7 +21,7 @@ export const Notification = {
     findOne: async (id) => {
         const queryText = `
             SELECT 
-                n.id, n.type, n.is_read, n.created_at, n.sender_id, n.user_id, n.receiver_id,
+                n.id, n.type, n.is_read, n.created_at, n.sender_id, n.receiver_id, n.receiver_id,
                 u.name AS sender_name,
                 u.email AS sender_email
             FROM notifications n
@@ -47,7 +47,7 @@ export const Notification = {
         const queryText = `
             UPDATE notifications
             SET is_read = TRUE
-            WHERE user_id = $1 AND is_read = FALSE;
+            WHERE receiver_id = $1 AND is_read = FALSE;
         `;
         const result = await pool.query(queryText, [userId]);
         return result.rowCount;
