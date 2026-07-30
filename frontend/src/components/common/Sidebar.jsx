@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
  
 import { MdGroups3, MdHome, MdOutlineSettings } from "react-icons/md";
@@ -9,6 +9,7 @@ import { FaBuildingUser } from "react-icons/fa6";
 import { IoMdNotifications } from "react-icons/io";
 import { BsBuildingsFill } from "react-icons/bs";
 import { RiLogoutBoxLine } from "react-icons/ri";
+import { useToast } from '../../context/ToastContext.jsx'; // 🔥 Mengimpor context Toast
 
 const HomeIcon = () => <MdHome className="w-5 h-5" />;
 const MeetingIcon = () => <MdGroups3 className="w-5 h-5" />;
@@ -33,7 +34,7 @@ function NavItem({ item, isActive, onClick }) {
   return (
     <button
       onClick={() => onClick(item.id)}
-      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 cursor-pointer text-left ${
+      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 duration-150 cursor-pointer text-left ${
         isActive 
           ? "bg-brand text-white shadow-sm" 
           : "text-slate-400 hover:bg-slate-700/50 hover:text-white"
@@ -49,25 +50,37 @@ export default function Sidebar() {
   const location = useLocation(); 
   const navigate = useNavigate(); 
   const queryClient = useQueryClient();
+  const { showToast } = useToast(); // 🎯 Menggunakan fungsi penampil toast
 
-  const { mutate: logoutUser, isPending:isLoggingOut } = useMutation({
+  // 📡 1. FETCH DATA: Mengambil data identitas pengguna yang sedang masuk
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: async () => {
+      const response = await axios.get('/api/auth/me');
+      return response.data;
+    }
+  });
+
+  // 📡 2. MUTASI DATA: Aksi Logout Pengguna
+  const { mutate: logoutUser, isPending: isLoggingOut } = useMutation({
     mutationFn: async () => {
-      const response = await axios.post('/api/auth/logout')
+      const response = await axios.post('/api/auth/logout');
       return response.data;
     },
     onSuccess: () => {
       console.log("Logout berhasil");
-      queryClient.clear();
+      queryClient.clear(); // Bersihkan seluruh cache query pasca-logout untuk keamanan data
       navigate('/login');
     },
     onError: (error) => {
       const errorMessage = error.response?.data?.message || "Gagal keluar aplikasi.";
-      alert(`Logout Gagal: ${errorMessage}`);
+      // 🔥 Mengganti alert dengan toast notification
+      showToast(`Logout Gagal: ${errorMessage}`, "error");
     }
   });
 
   const handleLogout = () => {
-    logoutUser();
+    if (!isLoggingOut) logoutUser();
   };
 
   const handleNavClick = (id) => {
@@ -94,28 +107,38 @@ export default function Sidebar() {
         ))}
       </nav>
 
+      {/* 👤 Tempat Profil Pengguna Aktif Dinamis */}
       <div className="p-4 border-t border-slate-700/50">
         <div className="relative flex items-center gap-3 p-3 bg-slate-900/40 rounded-xl border border-slate-700/30 group hover:bg-slate-900/70 transition-all duration-200">
           <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-700 border border-slate-600 shrink-0">
             <img 
-              src="/placeholder.png" 
+              src={currentUser?.profile_picture || "/placeholder.png"} 
               alt="Avatar Karyawan" 
               className="w-full h-full object-cover"
               onError={(e) => {
-                e.target.src = "https://ui-avatars.com/api/?name=Aryo+Sheva&background=4F46E5&color=fff";
+                // Tampilkan inisial nama dinamis jika gambar profil kosong atau gagal dimuat
+                const nameParam = encodeURIComponent(currentUser?.name || 'User');
+                e.target.src = `https://ui-avatars.com/api/?name=${nameParam}&background=4F46E5&color=fff`;
               }}
             />
           </div>
 
           <div className="flex flex-col min-w-0 pr-6">
-            <p className="text-white font-semibold text-sm truncate">Aryo Sheva R.</p>
-            <p className="text-slate-500 text-xs truncate">EMP001 • Admin</p>
+            {/* Menampilkan Nama Karyawan Dinamis */}
+            <p className="text-white font-semibold text-sm truncate">
+              {currentUser?.name || "Memuat..."}
+            </p>
+            {/* Menampilkan ID Karyawan & Peran secara Dinamis */}
+            <p className="text-slate-500 text-xs truncate uppercase">
+              {currentUser ? `${currentUser.display_id} • ${currentUser.role}` : "..."}
+            </p>
           </div>
 
           <button
             onClick={handleLogout}
+            disabled={isLoggingOut}
             title="Keluar Aplikasi"
-            className="absolute top-2.5 right-2.5 text-slate-500 hover:text-rose-400 p-1 rounded-md hover:bg-slate-800 transition-all cursor-pointer"
+            className="absolute top-2.5 right-2.5 text-slate-500 hover:text-rose-400 p-1 rounded-md hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50"
           >
             <RiLogoutBoxLine className="w-4 h-4" />
           </button>
